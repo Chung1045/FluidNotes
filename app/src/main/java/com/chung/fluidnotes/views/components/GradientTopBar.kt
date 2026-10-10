@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,12 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +50,7 @@ import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.views.NoteEditDropMenu
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -160,51 +164,57 @@ fun BoxScope.GradientTopBar(
                 Spacer(modifier = Modifier.width(10.dp))
 
                 if (topBarMode == GradientTopBarMode.Default || topBarMode == GradientTopBarMode.ViewerMode) {
-                    Box {
-                        IconButton(
-                            onClick = { onShowMenuChange(true) },
-                            enabled = !showMenu,
-                            modifier = Modifier
-                                .alpha(if (showMenu) 0f else 1f)
-                                .size(buttonSize)
-                                .clip(CircleShape)
-                                .then(
-                                    if (!isLowEnd) {
-                                        Modifier.hazeBlur(
-                                            input = HazeInput.Sources(hazeState),
-                                            style = blurTexture.then { blurRadius(10.dp) },
-                                            performanceMode = HazePerformanceMode.Performance
-                                        )
-                                    } else {
-                                        Modifier
-                                    }
-                                )
-                                .background(if (isLowEnd) AppTheme.controlsBackground.copy(alpha = 0.92f) else AppTheme.controlsBackground)
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = "More Options",
-                                tint = AppTheme.controlsForeground
+                    IconButton(
+                        onClick = { onShowMenuChange(true) },
+                        enabled = !showMenu,
+                        modifier = Modifier
+                            .alpha(if (showMenu) 0f else 1f)
+                            .size(buttonSize)
+                            .clip(CircleShape)
+                            .then(
+                                if (!isLowEnd) {
+                                    Modifier.hazeBlur(
+                                        input = HazeInput.Sources(hazeState),
+                                        style = blurTexture.then { blurRadius(10.dp) },
+                                        performanceMode = HazePerformanceMode.Performance
+                                    )
+                                } else {
+                                    Modifier
+                                }
                             )
-                        }
-
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { onShowMenuChange(false) }
-                        ) {
-                            menuContent()
-                        }
+                            .background(if (isLowEnd) AppTheme.controlsBackground.copy(alpha = 0.92f) else AppTheme.controlsBackground)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "More Options",
+                            tint = AppTheme.controlsForeground
+                        )
                     }
                 } else {
                     Box(modifier = Modifier.size(buttonSize))
                 }
             }
         }
+    }
+
+    // Overlay menu: lives in the parent Box (outside the top bar's AnimatedVisibility)
+    // so its fillMaxSize covers the whole screen and tap-outside-to-dismiss works everywhere.
+    // The anchor mirrors the top bar Row layout, so the menu's top-right corner lands exactly
+    // on the top-right corner of the ⋮ button: status bar inset + topPadding from the top,
+    // horizontalPadding from the end.
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    CompositionLocalProvider(
+        LocalDropdownAnchor provides DropdownAnchor(
+            top = statusBarTop + topPadding,
+            end = horizontalPadding
+        )
+    ) {
+        menuContent()
     }
 }
 
@@ -340,6 +350,45 @@ fun PreviewTopBarTabletWithActionBar() {
                 showMenu = false,
                 onShowMenuChange = {},
                 onClose = {}
+            )
+        }
+    }
+}
+
+@Composable
+@Preview(name = "Embedded Viewer ActionBar with Menu", showBackground = true, device = Devices.PIXEL_6)
+fun PreviewTopBarWithActionBarMenu() {
+    val hazeState = rememberHazeState()
+
+    AppTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.test_photo),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(state = hazeState)
+            )
+
+            GradientTopBar(
+                topBarMode = GradientTopBarMode.ViewerMode,
+                hazeState = hazeState,
+                isUiChromeVisible = true,
+                showMenu = true,
+                onShowMenuChange = {},
+                onClose = {},
+                menuContent = {
+                    NoteEditDropMenu(
+                        hazeState = hazeState,
+                        expanded = true,
+                        onDismissRequest = { },
+                        onTrashClick = { },
+                    ) }
             )
         }
     }

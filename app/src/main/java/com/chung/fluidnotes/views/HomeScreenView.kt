@@ -67,8 +67,13 @@ fun HomeScreenView(
 ) {
     val hazeState = rememberHazeState()
     val context = LocalContext.current
+    val isLargeDevice = Utils.isLargeDevice()
     val columnCells = remember(context) {
-        StaggeredGridCells.Adaptive(160.dp)
+        if (isLargeDevice) {
+            StaggeredGridCells.Adaptive(200.dp)
+        } else {
+            StaggeredGridCells.Adaptive(160.dp)
+        }
     }
 
     var menuExpanded by remember { mutableStateOf(false) }

@@ -1,11 +1,14 @@
 package com.chung.fluidnotes.activity
 
+import android.app.Activity
+import android.app.Dialog
 import android.content.Intent
 import android.os.Bundle
-import android.util.Patterns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -47,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,7 +88,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.utils.NoteDeleteHelper
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.views.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
@@ -127,6 +133,8 @@ class NoteEditViewActivity : ComponentActivity() {
                 val noteContent by viewModel.content.collectAsState()
                 val noteLastEdit by viewModel.lastEdit.collectAsState()
 
+                var showMenu by remember { mutableStateOf(false) }
+
                 // Pass states down to EditViewScreen
                 EditViewScreen(
                     isExistingNote = isExistingNote,
@@ -139,7 +147,9 @@ class NoteEditViewActivity : ComponentActivity() {
                         viewModel.saveNote {
                             finish()
                         }
-                    }
+                    },
+                    onShowMenuChange = {showMenu = it},
+                    showMenu = showMenu
                 )
             }
         }
@@ -155,8 +165,12 @@ fun EditViewScreen(
     noteLastEdit: Long = System.currentTimeMillis(),
     onTitleChange: (String) -> Unit,
     onContentChange: (TextFieldValue) -> Unit,
-    onBackPressed: () -> Unit
+    onBackPressed: () -> Unit,
+    onShowMenuChange: (Boolean) -> Unit,
+    showMenu: Boolean,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
@@ -174,6 +188,7 @@ fun EditViewScreen(
 
     val titleFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    var showTrashDialog by remember { mutableStateOf(false) }
 
     val titleInteractionSource = remember { MutableInteractionSource() }
     val contentInteractionSource = remember { MutableInteractionSource() }
@@ -184,6 +199,14 @@ fun EditViewScreen(
 
     val linkColor = AppTheme.controlsTint // read here, in @Composable context
     val linkTransformation = remember(linkColor) { LinkHighlightTransformation(linkColor) }
+
+    val trashLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK){
+
+        }
+    }
 
     LaunchedEffect(isContentFocused, imeBottomPx, noteContent.selection, contentTextLayout) {
         if (!isContentFocused || imeBottomPx <= 0) return@LaunchedEffect
@@ -325,10 +348,18 @@ fun EditViewScreen(
         }
 
         GradientTopBar(
-            topBarMode = GradientTopBarMode.Actionless,
             hazeState = hazeState,
             showBackButton = true,
-            onClose = onBackPressed
+            onClose = onBackPressed,
+            menuContent = {
+                NoteEditDropMenu(
+                    hazeState = hazeState,
+                    expanded = showMenu,
+                    onDismissRequest = { onShowMenuChange(false) },
+                    onTrashClick = { showTrashDialog = true },
+                ) },
+            showMenu = showMenu,
+            onShowMenuChange = onShowMenuChange
         )
 
         Box(
@@ -344,6 +375,15 @@ fun EditViewScreen(
                         )
                     )
                 )
+        )
+
+        NoteDeleteHelper.TrashNoteDialog(
+            context = context,
+            coroutineScope = scope,
+            showTrashDialog = showTrashDialog,
+            trashLauncher = trashLauncher,
+            onFetchUris = { emptyList() },   // placeholder for testing
+            onDismissDelete = { showTrashDialog = false }
         )
     }
 }
@@ -374,7 +414,7 @@ fun LinkEntriesSection(
                         val intent = Intent(Intent.ACTION_VIEW, fullUrl.toUri())
                         context.startActivity(intent)
                     }
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 16.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Link,
@@ -422,18 +462,22 @@ class LinkHighlightTransformation(
     private val linkColor: Color
 ) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val matcher = Patterns.WEB_URL.matcher(text.text)
+        val plain = text.text
         val annotated = buildAnnotatedString {
             append(text)
-            while (matcher.find()) {
-                addStyle(
-                    style = SpanStyle(
-                        color = linkColor,
-                        textDecoration = TextDecoration.Underline
-                    ),
-                    start = matcher.start(),
-                    end = matcher.end()
-                )
+            for (url in Utils.extractLinks(plain)) {
+                var start = plain.indexOf(url)
+                while (start != -1) {
+                    addStyle(
+                        style = SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline
+                        ),
+                        start = start,
+                        end = start + url.length
+                    )
+                    start = plain.indexOf(url, start + url.length)
+                }
             }
         }
         // No characters added/removed — identity mapping is correct
@@ -452,7 +496,27 @@ fun EditViewScreenPreview() {
             noteLastEdit = System.currentTimeMillis(),
             onTitleChange = {},
             onContentChange = {},
-            onBackPressed = {}
+            onBackPressed = {},
+            onShowMenuChange = {},
+            showMenu = false
+        )
+    }
+}
+
+@Composable
+@Preview(showBackground = true, device = "id:pixel_9_pro_xl")
+fun EditViewScreenPreviewII() {
+    AppTheme {
+        EditViewScreen(
+            isExistingNote = true,
+            noteTitle = "Sample Title",
+            noteContent = TextFieldValue("Sample content..."),
+            noteLastEdit = System.currentTimeMillis(),
+            onTitleChange = {},
+            onContentChange = {},
+            onBackPressed = {},
+            onShowMenuChange = {},
+            showMenu = true
         )
     }
 }

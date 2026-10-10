@@ -5,6 +5,7 @@ import androidx.room3.Delete
 import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
+import androidx.room3.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -21,4 +22,10 @@ interface NotesDAO {
 
     @Query("SELECT * FROM fluidnotes WHERE id = :id LIMIT 1")
     suspend fun getNoteById(id: Int): NoteItem?
+
+    @Query("UPDATE fluidnotes SET isTrashed = 1 WHERE id = (:ids)")
+    suspend fun setNoteTrashed(ids: List<Int>)
+
+    @Query("UPDATE fluidnotes SET isTrashed = 0 WHERE id = (:ids)")
+    suspend fun setNoteUnTrashed(ids: List<Int>)
 }
