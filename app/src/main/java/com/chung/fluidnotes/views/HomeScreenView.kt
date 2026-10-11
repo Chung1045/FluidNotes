@@ -1,14 +1,21 @@
 package com.chung.fluidnotes.views
 
 import android.content.Intent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,11 +66,12 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreenView(
     modifier: Modifier = Modifier,
-    notes: List<NoteItem> = emptyList()
+    notes: List<NoteItem> = emptyList(),
+    isLoading: Boolean = false
 ) {
     val hazeState = rememberHazeState()
     val context = LocalContext.current
@@ -102,60 +110,94 @@ fun HomeScreenView(
                     onClick = {
                         val intent = Intent(context, NoteEditViewActivity::class.java).apply {
                             putExtra("is_existing_note", false)
-                            putExtra("note_id", 0) // Use 0 for new notes
+                            putExtra("note_id", 0)
                         }
                         context.startActivity(intent)
                     }
                 )
             }
-        ) { padding ->
+        ) { _ ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .hazeSource(hazeState),
                 contentAlignment = Alignment.TopCenter
             ) {
-                if (notes.isEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
-                    ) {
-                        Text(
-                            text = "No notes",
-                            fontSize = 18.sp,
-                            color = AppTheme.controlsForeground,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "Create new note",
-                            fontSize = 14.sp,
-                            color = AppTheme.controlsForeground.copy(alpha = 0.6f),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                when {
+                    isLoading -> {
+                        // Random card height for skeleton note cards
+                        val skeletonHeights = remember {
+                            val random = kotlin.random.Random(System.currentTimeMillis())
+                            // Generates 12 random heights between 120.dp and 230.dp
+                            List(12) { random.nextInt(120, 231).dp }
+                        }
+
+                        // Display staggered grid with skeleton cards while loading
+                        LazyVerticalStaggeredGrid(
+                            columns = columnCells,
+                            state = rememberLazyStaggeredGridState(),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = gradientTopBarHeight() + 8.dp,
+                                bottom = 80.dp + navBarInset
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 8.dp
+                        ) {
+                            items(12) {  index ->
+                                NoteCardSkeleton(
+                                    modifier = Modifier.height(
+                                        skeletonHeights[index % skeletonHeights.size]
+                                    )
+                                )
+                            }
+                        }
                     }
-                }else {
-                    LazyVerticalStaggeredGrid(
-                        columns = columnCells,
-                        state = rememberLazyStaggeredGridState(),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = gradientTopBarHeight() + 8.dp,
-                            bottom = 80.dp + navBarInset
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalItemSpacing = 8.dp
-                    ) {
-                        items(notes.size) { index ->
-                            val note = notes[index]
-                            NoteCard(
-                                noteId = note.id,
-                                noteTitle = note.title,
-                                noteContent = note.content,
-                                noteLastEditTimestamp = note.timestamp
+                    notes.isEmpty() -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
+                        ) {
+                            Text(
+                                text = "No notes",
+                                fontSize = 18.sp,
+                                color = AppTheme.controlsForeground,
+                                style = MaterialTheme.typography.bodyLarge
                             )
+                            Text(
+                                text = "Create new note",
+                                fontSize = 14.sp,
+                                color = AppTheme.controlsForeground.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                    else -> {
+                        LazyVerticalStaggeredGrid(
+                            columns = columnCells,
+                            state = rememberLazyStaggeredGridState(),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = gradientTopBarHeight() + 8.dp,
+                                bottom = 80.dp + navBarInset
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 8.dp
+                        ) {
+                            items(notes.size) { index ->
+                                val note = notes[index]
+                                NoteCard(
+                                    noteId = note.id,
+                                    noteTitle = note.title,
+                                    noteContent = note.content,
+                                    noteLastEditTimestamp = note.timestamp
+                                )
+                            }
                         }
                     }
                 }
@@ -196,6 +238,72 @@ fun HomeScreenView(
                 )
             }
         )
+    }
+}
+
+@Composable
+fun NoteCardSkeleton(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "skeletonPulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "skeletonAlpha"
+    )
+
+    val placeholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha * 0.4f),
+                shape = MaterialTheme.shapes.medium
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                shape = MaterialTheme.shapes.medium
+            )
+            .padding(16.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Title placeholder bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(20.dp)
+                    .background(
+                        color = placeholderColor.copy(alpha = 0.3f),
+                        shape = MaterialTheme.shapes.small
+                    )
+            )
+            // Content placeholder lines
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(14.dp)
+                    .background(
+                        color = placeholderColor.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.small
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.4f)
+                    .height(14.dp)
+                    .background(
+                        color = placeholderColor.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.small
+                    )
+            )
+        }
     }
 }
 
@@ -284,4 +392,10 @@ fun HomeScreenViewPreview() {
     )
 
     HomeScreenView(notes = sampleNotes)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenViewLoadingPreview() {
+    HomeScreenView(notes = emptyList(), isLoading = true)
 }
