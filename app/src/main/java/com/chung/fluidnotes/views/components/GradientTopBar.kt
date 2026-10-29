@@ -9,10 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,6 +68,48 @@ enum class GradientTopBarMode {
 @Composable
 fun gradientTopBarHeight(): Dp = (120 * Utils.getUIScale()).dp
 
+@Composable
+private fun topScrimBrush(): Brush = Brush.verticalGradient(
+    colors = listOf(
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+        Color.Transparent
+    )
+)
+
+/** Standalone top scrim. Draw it once outside any top-bar swap so it never cross-fades. */
+@Composable
+fun TopScrim(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(gradientTopBarHeight())
+            .background(topScrimBrush())
+    )
+}
+
+/** Standalone bottom scrim (same look as the one on the Home screen). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BottomScrim(modifier: Modifier = Modifier) {
+    val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateBottomPadding()
+    val baseHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(baseHeight + navBarInset)
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.Transparent, MaterialTheme.colorScheme.surface)
+                )
+            )
+    )
+}
+
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun BoxScope.GradientTopBar(
@@ -74,6 +118,7 @@ fun BoxScope.GradientTopBar(
     isUiChromeVisible: Boolean = true,
     showMenu: Boolean = false,
     showBackButton: Boolean = true,
+    showScrim: Boolean = true,
     modifier: Modifier = Modifier,
     onShowMenuChange: (Boolean) -> Unit = {},
     onClose: () -> Unit = {},
@@ -101,21 +146,9 @@ fun BoxScope.GradientTopBar(
                 .fillMaxWidth()
                 .height(gradientTopBarHeight())
         ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
+            if (showScrim) {
+                Box(Modifier.matchParentSize().background(topScrimBrush()))
+            }
 
             Row(
                 modifier = Modifier
@@ -221,6 +254,7 @@ fun BoxScope.GradientTopBar(
 fun BoxScope.GradientTopBarContainer(
     hazeState: HazeState,
     isUiChromeVisible: Boolean = true,
+    showScrim: Boolean = true,
     modifier: Modifier = Modifier,
     navigationIcon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
@@ -243,22 +277,9 @@ fun BoxScope.GradientTopBarContainer(
                 .fillMaxWidth()
                 .height(gradientTopBarHeight())
         ) {
-            // Gradient Backdrop
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
+            if (showScrim) {
+                Box(Modifier.matchParentSize().background(topScrimBrush()))
+            }
 
             Row(
                 modifier = Modifier

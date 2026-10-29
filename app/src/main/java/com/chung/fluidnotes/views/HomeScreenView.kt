@@ -3,12 +3,16 @@ package com.chung.fluidnotes.views
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.visible
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -62,7 +67,9 @@ import com.chung.fluidnotes.activity.NoteEditViewActivity
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.GradientTopBar
+import com.chung.fluidnotes.views.components.TopScrim
 import com.chung.fluidnotes.views.components.HomeDropMenu
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
@@ -70,6 +77,8 @@ import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+
+private enum class NotesContentState { Loading, Empty, Content }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -125,20 +134,23 @@ fun HomeScreenView(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             floatingActionButton = {
-                HazeFAB(
-                    modifier = Modifier
-                        .padding(
-                            bottom = navBarInset
-                        ),
-                    hazeState = hazeState,
-                    onClick = {
-                        val intent = Intent(context, NoteEditViewActivity::class.java).apply {
-                            putExtra("is_existing_note", false)
-                            putExtra("note_id", 0)
+                AnimatedVisibility(
+                    visible = !isSelecting,
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(200))
+                ) {
+                    HazeFAB(
+                        modifier = Modifier.padding(bottom = navBarInset),
+                        hazeState = hazeState,
+                        onClick = {
+                            val intent = Intent(context, NoteEditViewActivity::class.java).apply {
+                                putExtra("is_existing_note", false)
+                                putExtra("note_id", 0)
+                            }
+                            context.startActivity(intent)
                         }
-                        context.startActivity(intent)
-                    }
-                )
+                    )
+                }
             }
         ) { _ ->
             Box(
@@ -147,96 +159,108 @@ fun HomeScreenView(
                     .hazeSource(hazeState),
                 contentAlignment = Alignment.TopCenter
             ) {
-                when {
-                    isLoading -> {
-                        // Random card height for skeleton note cards
-                        val skeletonHeights = remember {
-                            val random = kotlin.random.Random(System.currentTimeMillis())
-                            // Generates 12 random heights between 120.dp and 230.dp
-                            List(12) { random.nextInt(120, 231).dp }
-                        }
+                val contentState = when {
+                    isLoading -> NotesContentState.Loading
+                    notes.isEmpty() -> NotesContentState.Empty
+                    else -> NotesContentState.Content
+                }
+                Crossfade(
+                    targetState = contentState,
+                    modifier = Modifier.fillMaxSize(),
+                    animationSpec = tween(300),
+                    label = "notesContent"
+                ) { state ->
+                    when (state) {
+                        NotesContentState.Loading -> {
+                            // Random card height for skeleton note cards
+                            val skeletonHeights = remember {
+                                val random = kotlin.random.Random(System.currentTimeMillis())
+                                // Generates 12 random heights between 120.dp and 230.dp
+                                List(12) { random.nextInt(120, 231).dp }
+                            }
 
-                        // Display staggered grid with skeleton cards while loading
-                        LazyVerticalStaggeredGrid(
-                            columns = columnCells,
-                            state = rememberLazyStaggeredGridState(),
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = gradientTopBarHeight() + 8.dp,
-                                bottom = 80.dp + navBarInset
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp
-                        ) {
-                            items(12) {  index ->
-                                NoteCardSkeleton(
-                                    modifier = Modifier.height(
-                                        skeletonHeights[index % skeletonHeights.size]
+                            // Display staggered grid with skeleton cards while loading
+                            LazyVerticalStaggeredGrid(
+                                columns = columnCells,
+                                state = rememberLazyStaggeredGridState(),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = gradientTopBarHeight() + 8.dp,
+                                    bottom = 80.dp + navBarInset
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 8.dp
+                            ) {
+                                items(12) {  index ->
+                                    NoteCardSkeleton(
+                                        modifier = Modifier.height(
+                                            skeletonHeights[index % skeletonHeights.size]
+                                        )
                                     )
+                                }
+                            }
+                        }
+                        NotesContentState.Empty -> {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
+                            ) {
+                                Text(
+                                    text = "No notes",
+                                    fontSize = 18.sp,
+                                    color = AppTheme.controlsForeground,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "Create new note",
+                                    fontSize = 14.sp,
+                                    color = AppTheme.controlsForeground.copy(alpha = 0.6f),
+                                    style = MaterialTheme.typography.bodyLarge
                                 )
                             }
                         }
-                    }
-                    notes.isEmpty() -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
-                        ) {
-                            Text(
-                                text = "No notes",
-                                fontSize = 18.sp,
-                                color = AppTheme.controlsForeground,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                text = "Create new note",
-                                fontSize = 14.sp,
-                                color = AppTheme.controlsForeground.copy(alpha = 0.6f),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
-                    else -> {
-                        LazyVerticalStaggeredGrid(
-                            columns = columnCells,
-                            state = rememberLazyStaggeredGridState(),
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = gradientTopBarHeight() + 8.dp,
-                                bottom = 80.dp + navBarInset
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp
-                        ) {
-                            items(
-                                items = notes,
-                                key = { it.id }
-                            ) { note ->
-                                NoteCard(
-                                    noteId = note.id,
-                                    noteTitle = note.title,
-                                    noteContent = note.content,
-                                    noteLastEditTimestamp = note.timestamp,
-                                    isSelecting = isSelecting,
-                                    isSelected = note.id in selectedIds,
-                                    onClick = if (isSelecting) ({ toggle(note.id) }) else null,
-                                    onLongClick = {
-                                        isSelecting = true
-                                        toggle(note.id)
-                                    },
-                                    onCheckedChange = {
-                                        if (!isSelecting) {
+                        NotesContentState.Content -> {
+                            LazyVerticalStaggeredGrid(
+                                columns = columnCells,
+                                state = rememberLazyStaggeredGridState(),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = gradientTopBarHeight() + 8.dp,
+                                    bottom = 80.dp + navBarInset
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 8.dp
+                            ) {
+                                items(
+                                    items = notes,
+                                    key = { it.id }
+                                ) { note ->
+                                    NoteCard(
+                                        noteId = note.id,
+                                        noteTitle = note.title,
+                                        noteContent = note.content,
+                                        noteLastEditTimestamp = note.timestamp,
+                                        isSelecting = isSelecting,
+                                        isSelected = note.id in selectedIds,
+                                        onClick = if (isSelecting) ({ toggle(note.id) }) else null,
+                                        onLongClick = {
                                             isSelecting = true
-                                        }
-                                        toggle(note.id)
-                                    },
-                                    modifier = Modifier.animateItem()
-                                )
+                                            toggle(note.id)
+                                        },
+                                        onCheckedChange = {
+                                            if (!isSelecting) {
+                                                isSelecting = true
+                                            }
+                                            toggle(note.id)
+                                        },
+                                        modifier = Modifier.animateItem()
+                                    )
+                                }
                             }
                         }
                     }
@@ -260,7 +284,9 @@ fun HomeScreenView(
             }
         }
 
-        AnimatedContent(
+        TopScrim(Modifier.align(Alignment.TopCenter))
+
+        Crossfade (
             targetState = isSelecting,
             modifier = Modifier.fillMaxWidth(),
             label = "topBarSwap"
@@ -279,6 +305,7 @@ fun HomeScreenView(
                 // GradientTopBar
                 GradientTopBar(
                     hazeState = hazeState,
+                    showScrim = false,
                     showBackButton = false,
                     showMenu = menuExpanded,
                     onShowMenuChange = { menuExpanded = it },
@@ -304,6 +331,12 @@ fun HomeScreenView(
                 )
             }
         }
+
+        BottomActionBar(
+            hazeState = hazeState,
+            selectedCount = selectedIds.count(),
+            visible = isSelecting,
+        )
     }
 }
 
