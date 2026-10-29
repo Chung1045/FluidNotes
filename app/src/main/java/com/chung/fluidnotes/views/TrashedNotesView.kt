@@ -2,8 +2,10 @@ package com.chung.fluidnotes.views
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +40,7 @@ import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils.isLargeDevice
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.NoteCard
+import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
@@ -76,6 +82,26 @@ fun TrashedNotesView(
     val skeletonHeights = remember {
         val random = kotlin.random.Random(System.currentTimeMillis())
         List(12) { random.nextInt(120, 231).dp }
+    }
+
+    var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
+    var isSelecting by remember { mutableStateOf(false) }
+
+    fun exitSelection() {
+        isSelecting = false
+        selectedIds = emptySet()
+    }
+
+    fun toggle(id: Int) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+    }
+
+    BackHandler(enabled = isSelecting) { exitSelection() }
+
+    LaunchedEffect(notes) {
+        val safeNotes = notes.orEmpty()
+        selectedIds = selectedIds intersect safeNotes.map { it.id }.toSet()
+        if (safeNotes.isEmpty()) isSelecting = false
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -148,6 +174,19 @@ fun TrashedNotesView(
                                         noteTitle = note.title,
                                         noteContent = note.content,
                                         noteLastEditTimestamp = note.timestamp,
+                                        isSelecting = isSelecting,
+                                        isSelected = note.id in selectedIds,
+                                        onClick = if (isSelecting) ({ toggle(note.id) }) else null,
+                                        onLongClick = {
+                                            isSelecting = true
+                                            toggle(note.id)
+                                        },
+                                        onCheckedChange = {
+                                            if (!isSelecting) {
+                                                isSelecting = true
+                                            }
+                                            toggle(note.id)
+                                        },
                                         modifier = Modifier.animateItem()
                                     )
                                 }
@@ -158,13 +197,32 @@ fun TrashedNotesView(
             }
         }
 
-        GradientTopBar(
-            hazeState = hazeState,
-            showBackButton = true,
-            onClose = onClose,
-            showMenu = false,
-            onShowMenuChange = { }
-        )
+        AnimatedContent(
+            targetState = isSelecting,
+            modifier = Modifier.fillMaxWidth(),
+            label = "topBarSwap"
+        ) { selecting ->
+            if (selecting) {
+                val safeNotes = notes.orEmpty()
+                SelectedItemCountToolbar(
+                    hazeState = hazeState,
+                    count = selectedIds.size,
+                    isChecked = safeNotes.isNotEmpty() && selectedIds.size == safeNotes.size,
+                    onCheckedChange = { checked ->
+                        selectedIds = if (checked) safeNotes.map { it.id }.toSet() else emptySet()
+                    },
+                    onClose = { exitSelection() }
+                )
+            } else {
+                GradientTopBar(
+                    hazeState = hazeState,
+                    showBackButton = true,
+                    onClose = onClose,
+                    showMenu = false,
+                    onShowMenuChange = { }
+                )
+            }
+        }
     }
 }
 

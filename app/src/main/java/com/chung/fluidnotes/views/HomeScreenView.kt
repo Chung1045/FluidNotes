@@ -1,6 +1,8 @@
 package com.chung.fluidnotes.views
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +65,7 @@ import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.HomeDropMenu
 import com.chung.fluidnotes.views.components.NoteCard
+import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -86,6 +90,25 @@ fun HomeScreenView(
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
+
+    var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
+    var isSelecting by remember { mutableStateOf(false) }
+
+    fun exitSelection() {
+        isSelecting = false
+        selectedIds = emptySet()
+    }
+
+    fun toggle(id: Int) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+    }
+
+    BackHandler(enabled = isSelecting) { exitSelection() }
+
+    LaunchedEffect(notes) {
+        selectedIds = selectedIds intersect notes.map { it.id }.toSet()
+        if (notes.isEmpty()) isSelecting = false
+    }
 
     val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
         .asPaddingValues()
@@ -199,6 +222,19 @@ fun HomeScreenView(
                                     noteTitle = note.title,
                                     noteContent = note.content,
                                     noteLastEditTimestamp = note.timestamp,
+                                    isSelecting = isSelecting,
+                                    isSelected = note.id in selectedIds,
+                                    onClick = if (isSelecting) ({ toggle(note.id) }) else null,
+                                    onLongClick = {
+                                        isSelecting = true
+                                        toggle(note.id)
+                                    },
+                                    onCheckedChange = {
+                                        if (!isSelecting) {
+                                            isSelecting = true
+                                        }
+                                        toggle(note.id)
+                                    },
                                     modifier = Modifier.animateItem()
                                 )
                             }
@@ -224,27 +260,50 @@ fun HomeScreenView(
             }
         }
 
-        // GradientTopBar
-        GradientTopBar(
-            hazeState = hazeState,
-            showBackButton = false,
-            showMenu = menuExpanded,
-            onShowMenuChange = { menuExpanded = it },
-            onClose = {},
-            menuContent = {
-                HomeDropMenu(
+        AnimatedContent(
+            targetState = isSelecting,
+            modifier = Modifier.fillMaxWidth(),
+            label = "topBarSwap"
+        ) { selecting ->
+            if (selecting) {
+                SelectedItemCountToolbar(
                     hazeState = hazeState,
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    onSettingsClick = { menuExpanded = false },
-                    onHelpClick = { menuExpanded = false },
-                    onTrashedNotesClick = {
-                        menuExpanded = false
-                        context.startActivity(Intent(context, TrashedNotesActivity::class.java))
+                    count = selectedIds.size,
+                    isChecked = notes.isNotEmpty() && selectedIds.size == notes.size,
+                    onCheckedChange = { checked ->
+                        selectedIds = if (checked) notes.map { it.id }.toSet() else emptySet()
+                    },
+                    onClose = { exitSelection() }
+                )
+            } else {
+                // GradientTopBar
+                GradientTopBar(
+                    hazeState = hazeState,
+                    showBackButton = false,
+                    showMenu = menuExpanded,
+                    onShowMenuChange = { menuExpanded = it },
+                    onClose = {},
+                    menuContent = {
+                        HomeDropMenu(
+                            hazeState = hazeState,
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            onSettingsClick = { menuExpanded = false },
+                            onHelpClick = { menuExpanded = false },
+                            onTrashedNotesClick = {
+                                menuExpanded = false
+                                context.startActivity(
+                                    Intent(
+                                        context,
+                                        TrashedNotesActivity::class.java
+                                    )
+                                )
+                            }
+                        )
                     }
                 )
             }
-        )
+        }
     }
 }
 
