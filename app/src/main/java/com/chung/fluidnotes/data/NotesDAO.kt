@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NotesDAO {
     // Room automatically updates the UI if the data changes because of Flow
-    @Query("SELECT * FROM fluidnotes ORDER BY timestamp DESC")
+    @Query("SELECT * FROM fluidnotes WHERE  isTrashed = 0 ORDER BY timestamp DESC")
     fun getAllNotes(): Flow<List<NoteItem>>
+
+    @Query("SELECT * FROM fluidnotes WHERE isTrashed = 1 ORDER BY timestamp DESC")
+    fun getAllTrashedNotes(): Flow<List<NoteItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: NoteItem)

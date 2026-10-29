@@ -1,7 +1,6 @@
 package com.chung.fluidnotes.activity
 
 import android.app.Activity
-import android.app.Dialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -88,11 +87,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
-import com.chung.fluidnotes.utils.NoteDeleteHelper
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.views.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.GradientTopBar
-import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -107,10 +104,8 @@ class NoteEditViewActivity : ComponentActivity() {
 
         val isExistingNote = intent.getBooleanExtra("is_existing_note", true)
         val noteId = intent.getIntExtra("note_id", 0)
-
         val dao = (application as FluidNotesApp).database.notesDao()
 
-        // Factory instantiation of ViewModel
         val viewModel = ViewModelProvider(
             this,
             object : ViewModelProvider.Factory {
@@ -124,31 +119,31 @@ class NoteEditViewActivity : ComponentActivity() {
         setContent {
             AppTheme {
                 val isDark = isSystemInDarkTheme()
-                LaunchedEffect(isDark) {
-                    /* Status bar logic */
-                }
+                LaunchedEffect(isDark) {}
 
-                // Observe ViewModel states
+                val isTrashed by viewModel.isTrashed.collectAsState()
                 val noteTitle by viewModel.title.collectAsState()
                 val noteContent by viewModel.content.collectAsState()
                 val noteLastEdit by viewModel.lastEdit.collectAsState()
 
                 var showMenu by remember { mutableStateOf(false) }
 
-                // Pass states down to EditViewScreen
                 EditViewScreen(
                     isExistingNote = isExistingNote,
+                    isTrashedView = isTrashed,
                     noteTitle = noteTitle,
                     noteContent = noteContent,
                     noteLastEdit = noteLastEdit,
                     onTitleChange = viewModel::onTitleChange,
                     onContentChange = viewModel::onContentChange,
                     onBackPressed = {
-                        viewModel.saveNote {
-                            finish()
-                        }
+                        if (isTrashed) finish()
+                        else viewModel.saveNote { finish() }
                     },
-                    onShowMenuChange = {showMenu = it},
+                    onTrashConfirmed = { viewModel.trashNote { finish() } },
+                    onRecoverClick = { viewModel.restoreNote { finish() } },
+                    onDeleteClick = { viewModel.deleteNote { finish() } },
+                    onShowMenuChange = { showMenu = it },
                     showMenu = showMenu
                 )
             }
@@ -160,11 +155,15 @@ class NoteEditViewActivity : ComponentActivity() {
 @Composable
 fun EditViewScreen(
     isExistingNote: Boolean = true,
+    isTrashedView: Boolean = false,
     noteTitle: String,
     noteContent: TextFieldValue,
     noteLastEdit: Long = System.currentTimeMillis(),
     onTitleChange: (String) -> Unit,
     onContentChange: (TextFieldValue) -> Unit,
+    onTrashConfirmed: () -> Unit = {},
+    onRecoverClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
     onBackPressed: () -> Unit,
     onShowMenuChange: (Boolean) -> Unit,
     showMenu: Boolean,
@@ -286,7 +285,8 @@ fun EditViewScreen(
                         },
                         container = {}
                     )
-                }
+                },
+                enabled = !isTrashedView
             )
 
             Text(
@@ -332,7 +332,8 @@ fun EditViewScreen(
                         },
                         container = {}
                     )
-                }
+                },
+                enabled = !isTrashedView
             )
 
             LinkEntriesSection(
@@ -356,7 +357,10 @@ fun EditViewScreen(
                     hazeState = hazeState,
                     expanded = showMenu,
                     onDismissRequest = { onShowMenuChange(false) },
+                    isTrashedView = isTrashedView,
                     onTrashClick = { showTrashDialog = true },
+                    onRecoverClick = onRecoverClick,
+                    onDeleteClick = onDeleteClick
                 ) },
             showMenu = showMenu,
             onShowMenuChange = onShowMenuChange
@@ -377,14 +381,15 @@ fun EditViewScreen(
                 )
         )
 
-        NoteDeleteHelper.TrashNoteDialog(
-            context = context,
-            coroutineScope = scope,
-            showTrashDialog = showTrashDialog,
-            trashLauncher = trashLauncher,
-            onFetchUris = { emptyList() },   // placeholder for testing
-            onDismissDelete = { showTrashDialog = false }
-        )
+        if (showTrashDialog) {
+            TrashDialog(
+                onDismissRequest = { showTrashDialog = false },
+                onConfirmation = {
+                    showTrashDialog = false
+                    onTrashConfirmed()
+                }
+            )
+        }
     }
 }
 
@@ -436,13 +441,13 @@ fun LinkEntriesSection(
 }
 
 @Composable
-fun DeleteDialog(
+fun TrashDialog(
     onDismissRequest: () -> Unit,
     onConfirmation: () -> Unit,
 ) {
     AlertDialog(
-        title = { Text(text = "Delete Note") },
-        text = { Text(text = "Are you sure you want to delete this note?") },
+        title = { Text(text = "Trash Note") },
+        text = { Text(text = "Are you sure you want to trash this note?") },
         onDismissRequest = { onDismissRequest() },
         confirmButton = {
             TextButton(onClick = { onConfirmation() }) {

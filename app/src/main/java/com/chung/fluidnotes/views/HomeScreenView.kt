@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,6 +59,7 @@ import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.views.components.GradientTopBar
+import com.chung.fluidnotes.views.components.HomeDropMenu
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import dev.chrisbanes.haze.HazeState
@@ -228,13 +228,16 @@ fun HomeScreenView(
             onShowMenuChange = { menuExpanded = it },
             onClose = {},
             menuContent = {
-                DropdownMenuItem(
-                    text = { Text("Settings") },
-                    onClick = { menuExpanded = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("Help & Feedback") },
-                    onClick = { menuExpanded = false }
+                HomeDropMenu(
+                    hazeState = hazeState,
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    onSettingsClick = { menuExpanded = false },
+                    onHelpClick = { menuExpanded = false },
+                    onTrashedNotesClick = {
+                        menuExpanded = false
+                        context.startActivity(Intent(context, TrashedNotesActivity::class.java))
+                    }
                 )
             }
         )

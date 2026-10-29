@@ -19,10 +19,14 @@ import dev.chrisbanes.haze.rememberHazeState
 @Composable
 internal fun NoteEditDropMenu(
     hazeState: HazeState,
+    isTrashedView: Boolean = false,
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    onTrashClick: () -> Unit = {}
+    onTrashClick: () -> Unit = {},
+    onRecoverClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
+
 ) {
     AppDropdownMenu(
         expanded = expanded,
@@ -30,13 +34,30 @@ internal fun NoteEditDropMenu(
         hazeState = hazeState,
         modifier = modifier
     ) {
-        AppDropdownMenuItem(
-            text = "Trash",
-            onClick = {
-                onDismissRequest()
-                onTrashClick()
-            }
-        )
+        if (!isTrashedView) {
+            AppDropdownMenuItem(
+                text = "Trash",
+                onClick = {
+                    onDismissRequest()
+                    onTrashClick()
+                }
+            )
+        } else {
+            AppDropdownMenuItem(
+                text = "Recover",
+                onClick = {
+                    onDismissRequest()
+                    onRecoverClick()
+                }
+            )
+            AppDropdownMenuItem(
+                text = "Delete",
+                onClick = {
+                    onDismissRequest()
+                    onDeleteClick()
+                }
+            )
+        }
     }
 }
 

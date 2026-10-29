@@ -29,17 +29,18 @@ class NoteViewModel(
     private var currentNote: NoteItem? = null
     private var debounceTimestampJob: Job? = null
 
+    private val _isTrashed = MutableStateFlow(false)
+    val isTrashed: StateFlow<Boolean> = _isTrashed.asStateFlow()
+
     init {
         if (noteId != null && noteId != 0) {
             viewModelScope.launch {
-                val notes = notesDao.getAllNotes().firstOrNull()
-                val note = notes?.find { it.id == noteId }
-
-                note?.let {
+                notesDao.getNoteById(noteId)?.let {
                     currentNote = it
                     _title.value = it.title
                     _content.value = TextFieldValue(it.content)
-                    _lastEdit.value = it.lastEdit // 1. Load initial timestamp into state
+                    _lastEdit.value = it.lastEdit
+                    _isTrashed.value = it.isTrashed
                 }
             }
         }
@@ -88,6 +89,31 @@ class NoteViewModel(
             )
 
             notesDao.insertNote(noteToSave)
+            onComplete()
+        }
+    }
+
+    fun trashNote(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            debounceTimestampJob?.cancel()
+            val id = currentNote?.id ?: noteId?.takeIf { it != 0 }
+            if (id != null) {
+                notesDao.setNoteTrashed(listOf(id))
+                currentNote = currentNote?.copy(isTrashed = true)
+                _isTrashed.value = true
+            }
+            onComplete()
+        }
+    }
+
+    fun restoreNote(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val id = currentNote?.id ?: noteId?.takeIf { it != 0 }
+            if (id != null) {
+                notesDao.setNoteUnTrashed(listOf(id))
+                currentNote = currentNote?.copy(isTrashed = false)
+                _isTrashed.value = false
+            }
             onComplete()
         }
     }

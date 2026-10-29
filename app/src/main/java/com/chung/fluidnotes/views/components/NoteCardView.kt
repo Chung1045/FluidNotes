@@ -28,6 +28,7 @@ fun NoteCard(
     noteTitle: String = "",
     noteContent: String = "",
     noteLastEditTimestamp: Long = -1,
+    isTrashed: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -44,9 +45,11 @@ fun NoteCard(
             .fillMaxWidth()
             .heightIn(min = 48.dp),
         onClick = {
-            val intent = Intent(context, NoteEditViewActivity::class.java)
-            intent.putExtra("note_id", noteId)
-            intent.putExtra("is_existing_note", true)
+            val intent = Intent(context, NoteEditViewActivity::class.java).apply {
+                putExtra("note_id", noteId)
+                putExtra("is_existing_note", true)
+                putExtra("is_trashed_view", isTrashed)
+            }
             context.startActivity(intent)
         }
     ) {

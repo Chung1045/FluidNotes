@@ -33,8 +33,8 @@ class MainActivity : ComponentActivity() {
                 // Track initial loading state
                 var isLoading by remember { mutableStateOf(true) }
 
-                // Collect the database Flow as a Compose State
-                val notes by dao.getAllNotes().collectAsState(initial = emptyList())
+                val notes by remember { dao.getAllNotes() }
+                    .collectAsState(initial = emptyList())
 
                 // Keep the skeleton loader visible for a smooth 600ms window on startup
                 LaunchedEffect(Unit) {

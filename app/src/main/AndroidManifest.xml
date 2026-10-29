@@ -29,8 +29,11 @@
             android:exported="true"
             android:theme="@style/Theme.Main"
             android:windowSoftInputMode="adjustResize">
-
         </activity>
+
+        <activity
+            android:name=".views.TrashedNotesActivity"
+            android:exported="false" />
 
         <activity
             android:name=".activity.ShareReceiverActivity"
