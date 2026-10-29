@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -189,13 +190,16 @@ fun HomeScreenView(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalItemSpacing = 8.dp
                         ) {
-                            items(notes.size) { index ->
-                                val note = notes[index]
+                            items(
+                                items = notes,
+                                key = { it.id }
+                            ) { note ->
                                 NoteCard(
                                     noteId = note.id,
                                     noteTitle = note.title,
                                     noteContent = note.content,
-                                    noteLastEditTimestamp = note.timestamp
+                                    noteLastEditTimestamp = note.timestamp,
+                                    modifier = Modifier.animateItem()
                                 )
                             }
                         }

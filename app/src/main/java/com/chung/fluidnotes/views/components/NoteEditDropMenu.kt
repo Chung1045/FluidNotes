@@ -1,4 +1,4 @@
-package com.chung.fluidnotes.views
+package com.chung.fluidnotes.views.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -10,8 +10,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.ui.theme.AppTheme
-import com.chung.fluidnotes.views.components.AppDropdownMenu
-import com.chung.fluidnotes.views.components.AppDropdownMenuItem
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState

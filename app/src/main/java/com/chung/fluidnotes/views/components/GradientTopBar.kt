@@ -50,7 +50,6 @@ import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
-import com.chung.fluidnotes.views.NoteEditDropMenu
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState

@@ -147,7 +147,8 @@ fun TrashedNotesView(
                                         noteId = note.id,
                                         noteTitle = note.title,
                                         noteContent = note.content,
-                                        noteLastEditTimestamp = note.timestamp
+                                        noteLastEditTimestamp = note.timestamp,
+                                        modifier = Modifier.animateItem()
                                     )
                                 }
                             }

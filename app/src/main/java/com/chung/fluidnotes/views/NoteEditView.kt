@@ -1,17 +1,12 @@
-package com.chung.fluidnotes.activity
+package com.chung.fluidnotes.views
 
 import android.app.Activity
 import android.content.Intent
-import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,15 +31,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,74 +74,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import com.chung.fluidnotes.FluidNotesApp
-import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
-import com.chung.fluidnotes.views.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.GradientTopBar
+import com.chung.fluidnotes.views.components.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
+import com.chung.fluidnotes.views.dialogs.DeleteDialog
+import com.chung.fluidnotes.views.dialogs.TrashDialog
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
-
-class NoteEditViewActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
-        window.isNavigationBarContrastEnforced = false
-        super.onCreate(savedInstanceState)
-
-        val isExistingNote = intent.getBooleanExtra("is_existing_note", true)
-        val noteId = intent.getIntExtra("note_id", 0)
-        val dao = (application as FluidNotesApp).database.notesDao()
-
-        val viewModel = ViewModelProvider(
-            this,
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return NoteViewModel(dao, noteId) as T
-                }
-            }
-        )[NoteViewModel::class.java]
-
-        setContent {
-            AppTheme {
-                val isDark = isSystemInDarkTheme()
-                LaunchedEffect(isDark) {}
-
-                val isTrashed by viewModel.isTrashed.collectAsState()
-                val noteTitle by viewModel.title.collectAsState()
-                val noteContent by viewModel.content.collectAsState()
-                val noteLastEdit by viewModel.lastEdit.collectAsState()
-
-                var showMenu by remember { mutableStateOf(false) }
-
-                EditViewScreen(
-                    isExistingNote = isExistingNote,
-                    isTrashedView = isTrashed,
-                    noteTitle = noteTitle,
-                    noteContent = noteContent,
-                    noteLastEdit = noteLastEdit,
-                    onTitleChange = viewModel::onTitleChange,
-                    onContentChange = viewModel::onContentChange,
-                    onBackPressed = {
-                        if (isTrashed) finish()
-                        else viewModel.saveNote { finish() }
-                    },
-                    onTrashConfirmed = { viewModel.trashNote { finish() } },
-                    onRecoverClick = { viewModel.restoreNote { finish() } },
-                    onDeleteClick = { viewModel.deleteNote { finish() } },
-                    onShowMenuChange = { showMenu = it },
-                    showMenu = showMenu
-                )
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -162,8 +97,8 @@ fun EditViewScreen(
     onTitleChange: (String) -> Unit,
     onContentChange: (TextFieldValue) -> Unit,
     onTrashConfirmed: () -> Unit = {},
+    onDeleteConfirmed: () -> Unit = {},
     onRecoverClick: () -> Unit = {},
-    onDeleteClick: () -> Unit = {},
     onBackPressed: () -> Unit,
     onShowMenuChange: (Boolean) -> Unit,
     showMenu: Boolean,
@@ -188,6 +123,7 @@ fun EditViewScreen(
     val titleFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     var showTrashDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val titleInteractionSource = remember { MutableInteractionSource() }
     val contentInteractionSource = remember { MutableInteractionSource() }
@@ -306,7 +242,7 @@ fun EditViewScreen(
                 visualTransformation = remember { linkTransformation },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp)
+                    .padding(top = 12.dp)
                     .bringIntoViewRequester(contentBringIntoViewRequester)
                     .onFocusChanged { isContentFocused = it.isFocused },
                 textStyle = TextStyle(
@@ -360,7 +296,7 @@ fun EditViewScreen(
                     isTrashedView = isTrashedView,
                     onTrashClick = { showTrashDialog = true },
                     onRecoverClick = onRecoverClick,
-                    onDeleteClick = onDeleteClick
+                    onDeleteClick = { showDeleteDialog = true }
                 ) },
             showMenu = showMenu,
             onShowMenuChange = onShowMenuChange
@@ -387,6 +323,16 @@ fun EditViewScreen(
                 onConfirmation = {
                     showTrashDialog = false
                     onTrashConfirmed()
+                }
+            )
+        }
+
+        if (showDeleteDialog) {
+            DeleteDialog(
+                onDismissRequest = { showTrashDialog = false },
+                onConfirmation = {
+                    showTrashDialog = false
+                    onDeleteConfirmed()
                 }
             )
         }
@@ -438,28 +384,6 @@ fun LinkEntriesSection(
             }
         }
     }
-}
-
-@Composable
-fun TrashDialog(
-    onDismissRequest: () -> Unit,
-    onConfirmation: () -> Unit,
-) {
-    AlertDialog(
-        title = { Text(text = "Trash Note") },
-        text = { Text(text = "Are you sure you want to trash this note?") },
-        onDismissRequest = { onDismissRequest() },
-        confirmButton = {
-            TextButton(onClick = { onConfirmation() }) {
-                Text("Yes")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { onDismissRequest() }) {
-                Text("No")
-            }
-        }
-    )
 }
 
 // Auto text styling for URL
