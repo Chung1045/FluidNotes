@@ -3,6 +3,7 @@ package com.chung.fluidnotes.views.components
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -43,6 +44,12 @@ fun FrostedIconButton(
         enabled = enabled,
         modifier = modifier
             .size(buttonSize)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = CircleShape
+            )
+            .padding(1.dp)
             .clip(CircleShape)
             .then(
                 if (!isLowEnd && hazeState != null) {
@@ -53,17 +60,11 @@ fun FrostedIconButton(
                     )
                 } else Modifier
             )
-            .background(if (isLowEnd || hazeState == null) backgroundColor.copy(alpha = 0.92f) else backgroundColor)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = CircleShape
+            .background(
+                if (isLowEnd || hazeState == null) backgroundColor.copy(alpha = 0.92f)
+                else backgroundColor
             )
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint
-        )
+        Icon(imageVector = icon, contentDescription = contentDescription, tint = tint)
     }
 }
