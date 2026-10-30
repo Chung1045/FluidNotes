@@ -1,4 +1,4 @@
-package com.chung.fluidnotes.views.components
+package com.chung.fluidnotes.views.components.dropmenu
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box

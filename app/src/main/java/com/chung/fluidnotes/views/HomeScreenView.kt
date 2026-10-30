@@ -1,20 +1,14 @@
 package com.chung.fluidnotes.views
 
 import android.content.Intent
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +19,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -48,34 +43,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.activity.NoteEditViewActivity
+import com.chung.fluidnotes.activity.TrashedNotesActivity
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.rememberLastNonEmpty
 import com.chung.fluidnotes.views.components.BottomActionBar
+import com.chung.fluidnotes.views.components.FrostedFAB
 import com.chung.fluidnotes.views.components.GradientTopBar
-import com.chung.fluidnotes.views.components.HomeDropMenu
 import com.chung.fluidnotes.views.components.NoteCard
-import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
+import com.chung.fluidnotes.views.components.NoteCardSkeleton
 import com.chung.fluidnotes.views.components.TopScrim
+import com.chung.fluidnotes.views.components.dropmenu.HomeDropMenu
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
+import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
+import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionState
 import com.chung.fluidnotes.views.dialogs.TrashDialog
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlin.time.Duration.Companion.milliseconds
 
 private enum class NotesContentState { Loading, Empty, Content }
 
@@ -87,6 +95,7 @@ fun HomeScreenView(
     isLoading: Boolean = false,
     onTrashNotes: (List<Int>) -> Unit = {}
 ) {
+    val displayedNotes = rememberLastNonEmpty(notes)
     val hazeState = rememberHazeState()
     val context = LocalContext.current
     val isLargeDevice = Utils.isLargeDevice()
@@ -99,32 +108,17 @@ fun HomeScreenView(
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
-    var showTrashDialog by remember {mutableStateOf(false)}
-
-    var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
-    var isSelecting by remember { mutableStateOf(false) }
-
-    fun exitSelection() {
-        isSelecting = false
-        selectedIds = emptySet()
-    }
-
-    fun toggle(id: Int) {
-        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-    }
-
-
-    BackHandler(enabled = isSelecting) { exitSelection() }
+    var showTrashDialog by remember { mutableStateOf(false) }
+    val selection = rememberSelectionState()
 
     LaunchedEffect(notes) {
-        selectedIds = selectedIds intersect notes.map { it.id }.toSet()
-        if (notes.isEmpty()) isSelecting = false
+        selection.retainOnly(notes.map { it.id })
     }
 
     val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
         .asPaddingValues()
         .calculateBottomPadding()
-
+    val fabBottom = max(navBarInset, rememberStableImeBottom())
     val baseScrimHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
 
     Box(modifier = modifier
@@ -137,12 +131,13 @@ fun HomeScreenView(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             floatingActionButton = {
                 AnimatedVisibility(
-                    visible = !isSelecting,
+                    visible = !selection.isSelecting,
                     enter = fadeIn(animationSpec = tween(200)),
                     exit = fadeOut(animationSpec = tween(200))
                 ) {
-                    HazeFAB(
-                        modifier = Modifier.padding(bottom = navBarInset),
+                    FrostedFAB(
+                        modifier = Modifier
+                            .padding(bottom = fabBottom),
                         hazeState = hazeState,
                         onClick = {
                             val intent = Intent(context, NoteEditViewActivity::class.java).apply {
@@ -239,7 +234,7 @@ fun HomeScreenView(
                                 verticalItemSpacing = 8.dp
                             ) {
                                 items(
-                                    items = notes,
+                                    items = displayedNotes,
                                     key = { it.id }
                                 ) { note ->
                                     NoteCard(
@@ -247,19 +242,11 @@ fun HomeScreenView(
                                         noteTitle = note.title,
                                         noteContent = note.content,
                                         noteLastEditTimestamp = note.timestamp,
-                                        isSelecting = isSelecting,
-                                        isSelected = note.id in selectedIds,
-                                        onClick = if (isSelecting) ({ toggle(note.id) }) else null,
-                                        onLongClick = {
-                                            isSelecting = true
-                                            toggle(note.id)
-                                        },
-                                        onCheckedChange = {
-                                            if (!isSelecting) {
-                                                isSelecting = true
-                                            }
-                                            toggle(note.id)
-                                        },
+                                        isSelecting = selection.isSelecting,
+                                        isSelected = note.id in selection.selectedIds,
+                                        onClick = if (selection.isSelecting) ({ selection.toggle(note.id) }) else null,
+                                        onLongClick = { selection.start(note.id) },
+                                        onCheckedChange = { selection.start(note.id) },
                                         modifier = Modifier.animateItem()
                                     )
                                 }
@@ -289,19 +276,20 @@ fun HomeScreenView(
         TopScrim(Modifier.align(Alignment.TopCenter))
 
         Crossfade (
-            targetState = isSelecting,
+            targetState = selection.isSelecting,
             modifier = Modifier.fillMaxWidth(),
             label = "topBarSwap"
         ) { selecting ->
             if (selecting) {
                 SelectedItemCountToolbar(
                     hazeState = hazeState,
-                    count = selectedIds.size,
-                    isChecked = notes.isNotEmpty() && selectedIds.size == notes.size,
+                    count = selection.count,
+                    isChecked = notes.isNotEmpty() && selection.count == notes.size,
                     onCheckedChange = { checked ->
-                        selectedIds = if (checked) notes.map { it.id }.toSet() else emptySet()
+                        if (checked) selection.selectAll(notes.map { it.id })
+                        else selection.deselectAll()
                     },
-                    onClose = { exitSelection() }
+                    onClose = { selection.clear() }
                 )
             } else {
                 // GradientTopBar
@@ -336,20 +324,20 @@ fun HomeScreenView(
 
         if (showTrashDialog) {
             TrashDialog(
-                count = selectedIds.count(),
+                count = selection.count,
                 onDismissRequest = { showTrashDialog = false },
                 onConfirmation = {
-                    onTrashNotes(selectedIds.toList())
+                    onTrashNotes(selection.selectedIds.toList())
                     showTrashDialog = false
-                    exitSelection()
+                    selection.clear()
                 }
             )
         }
 
         BottomActionBar(
             hazeState = hazeState,
-            selectedCount = selectedIds.count(),
-            visible = isSelecting,
+            selectedCount = selection.count,
+            visible = selection.isSelecting,
             onTrashClick = {
                 showTrashDialog = true
             }
@@ -357,70 +345,18 @@ fun HomeScreenView(
     }
 }
 
+@OptIn(FlowPreview::class)
 @Composable
-fun NoteCardSkeleton(modifier: Modifier = Modifier) {
-    val infiniteTransition = rememberInfiniteTransition(label = "skeletonPulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "skeletonAlpha"
-    )
-
-    val placeholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha * 0.4f),
-                shape = MaterialTheme.shapes.medium
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = MaterialTheme.shapes.medium
-            )
-            .padding(16.dp)
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Title placeholder bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(20.dp)
-                    .background(
-                        color = placeholderColor.copy(alpha = 0.3f),
-                        shape = MaterialTheme.shapes.small
-                    )
-            )
-            // Content placeholder lines
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(14.dp)
-                    .background(
-                        color = placeholderColor.copy(alpha = 0.2f),
-                        shape = MaterialTheme.shapes.small
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.4f)
-                    .height(14.dp)
-                    .background(
-                        color = placeholderColor.copy(alpha = 0.2f),
-                        shape = MaterialTheme.shapes.small
-                    )
-            )
-        }
+private fun rememberStableImeBottom(): Dp {
+    val density = LocalDensity.current
+    val ime = WindowInsets.ime
+    val settled by produceState(initialValue = 0.dp) {
+        snapshotFlow { ime.getBottom(density) }
+            .debounce(350.milliseconds)
+            .collect { value = with(density) { it.toDp() } }
     }
+    val animated by animateDpAsState(settled, label = "fabImeLift")
+    return animated
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

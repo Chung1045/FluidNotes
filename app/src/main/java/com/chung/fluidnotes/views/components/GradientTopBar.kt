@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +53,9 @@ import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.views.components.dropmenu.DropdownAnchor
+import com.chung.fluidnotes.views.components.dropmenu.LocalDropdownAnchor
+import com.chung.fluidnotes.views.components.dropmenu.NoteEditDropMenu
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -116,6 +120,7 @@ fun BoxScope.GradientTopBar(
     topBarMode: GradientTopBarMode = GradientTopBarMode.Default,
     hazeState: HazeState,
     isUiChromeVisible: Boolean = true,
+    isInSplit: Boolean = false,
     showMenu: Boolean = false,
     showBackButton: Boolean = true,
     showScrim: Boolean = true,
@@ -183,8 +188,8 @@ fun BoxScope.GradientTopBar(
                             )
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Navigate Back",
+                            imageVector = if (isInSplit) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = if (isInSplit) "Close Viewer" else "Navigate Back",
                             tint = AppTheme.controlsForeground
                         )
                     }
@@ -408,7 +413,8 @@ fun PreviewTopBarWithActionBarMenu() {
                         expanded = true,
                         onDismissRequest = { },
                         onTrashClick = { },
-                    ) }
+                    )
+                }
             )
         }
     }

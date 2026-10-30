@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:window="http://schemas.android.com/apk/res-auto">
+    <!-- Home or Trash on the left, note editor on the right -->
+    <SplitPairRule
+        window:splitRatio="0.65"
+        window:splitMinWidthDp="600"
+        window:finishPrimaryWithSecondary="never"
+        window:finishSecondaryWithPrimary="always"
+        window:clearTop="true">
+        <SplitPairFilter
+            window:primaryActivityName="com.chung.fluidnotes.activity.MainActivity"
+            window:secondaryActivityName="com.chung.fluidnotes.activity.NoteEditViewActivity" />
+        <SplitPairFilter
+            window:primaryActivityName="com.chung.fluidnotes.activity.TrashedNotesActivity"
+            window:secondaryActivityName="com.chung.fluidnotes.activity.NoteEditViewActivity" />
+    </SplitPairRule>
+</resources>

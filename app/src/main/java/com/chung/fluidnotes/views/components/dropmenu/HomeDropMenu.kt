@@ -1,4 +1,4 @@
-package com.chung.fluidnotes.views.components
+package com.chung.fluidnotes.views.components.dropmenu
 
 import androidx.compose.runtime.Composable
 import dev.chrisbanes.haze.HazeState

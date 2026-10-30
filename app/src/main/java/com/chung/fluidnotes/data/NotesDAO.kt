@@ -18,7 +18,7 @@ interface NotesDAO {
     fun getAllTrashedNotes(): Flow<List<NoteItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertNote(note: NoteItem)
+    suspend fun insertNote(note: NoteItem): Long
 
     @Delete
     suspend fun deleteNote(note: NoteItem)

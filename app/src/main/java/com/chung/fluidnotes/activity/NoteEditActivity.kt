@@ -13,12 +13,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.window.embedding.ActivityEmbeddingController
+import androidx.window.embedding.SplitController
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.views.EditViewScreen
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 class NoteEditViewActivity : ComponentActivity() {
+
+    private var noteId = 0
+    private lateinit var viewModel: NoteViewModel
+    private var skipSaveOnStop = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         window.isNavigationBarContrastEnforced = false
@@ -26,9 +37,22 @@ class NoteEditViewActivity : ComponentActivity() {
 
         val isExistingNote = intent.getBooleanExtra("is_existing_note", true)
         val noteId = intent.getIntExtra("note_id", 0)
+
+        if (noteId != 0) OpenNoteState.open(noteId)
+        this.noteId = noteId   // keep it in a property, see below
+
+        lifecycleScope.launch {
+            OpenNoteState.closeRequests.collect { ids ->
+                if (noteId in ids) {
+                    skipSaveOnStop = true
+                    finish()
+                }
+            }
+        }
+
         val dao = (application as FluidNotesApp).database.notesDao()
 
-        val viewModel = ViewModelProvider(
+        viewModel = ViewModelProvider(
             this,
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -50,9 +74,20 @@ class NoteEditViewActivity : ComponentActivity() {
 
                 var showMenu by remember { mutableStateOf(false) }
 
+                // Detect if the view is in split view
+                val activity = this@NoteEditViewActivity
+                val isInSplit by remember {
+                    SplitController.getInstance(activity)
+                        .splitInfoList(activity)
+                        .map { splits -> splits.any { it.contains(activity) } }
+                }.collectAsState(
+                    initial = ActivityEmbeddingController.getInstance(activity).isActivityEmbedded(activity)
+                )
+
                 EditViewScreen(
                     isExistingNote = isExistingNote,
                     isTrashedView = isTrashed,
+                    isInSplit = isInSplit,
                     noteTitle = noteTitle,
                     noteContent = noteContent,
                     noteLastEdit = noteLastEdit,
@@ -70,5 +105,16 @@ class NoteEditViewActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (skipSaveOnStop || !::viewModel.isInitialized) return
+        if (!viewModel.isTrashed.value) viewModel.saveNote { }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (!isChangingConfigurations) OpenNoteState.close(noteId)
     }
 }

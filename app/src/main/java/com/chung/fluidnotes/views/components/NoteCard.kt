@@ -21,6 +21,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,7 +35,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.chung.fluidnotes.activity.NoteEditViewActivity
 import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.utils.Utils
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun NoteCard(
@@ -55,14 +58,21 @@ fun NoteCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
+    val isActive by remember(noteId) {
+        OpenNoteState.openNoteId.map { noteId != 0 && it == noteId }
+    }.collectAsState(initial = noteId != 0 && OpenNoteState.openNoteId.collectAsState().value == noteId)
+    val highlighted = isSelected || isActive
+
     val openNote = {
-        context.startActivity(
-            Intent(context, NoteEditViewActivity::class.java).apply {
-                putExtra("note_id", noteId)
-                putExtra("is_existing_note", true)
-                putExtra("is_trashed_view", isTrashed)
-            }
-        )
+        if (!isActive) {
+            context.startActivity(
+                Intent(context, NoteEditViewActivity::class.java).apply {
+                    putExtra("note_id", noteId)
+                    putExtra("is_existing_note", true)
+                    putExtra("is_trashed_view", isTrashed)
+                }
+            )
+        }
     }
 
     Card(
@@ -71,10 +81,9 @@ fun NoteCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
         border = BorderStroke(
-            width = if (isSelected) 3.dp else 1.dp,
-            color = if (isSelected) AppTheme.controlsTint else MaterialTheme.colorScheme.outlineVariant.copy(
-                alpha = 0.4f
-            )
+            width = if (highlighted) 3.dp else 1.dp,
+            color = if (highlighted) AppTheme.controlsTint
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
         modifier = modifier
             .fillMaxWidth()

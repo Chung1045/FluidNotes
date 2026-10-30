@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.views.HomeScreenView
 import com.chung.fluidnotes.views.HomeScreenViewPreview
 import kotlinx.coroutines.delay
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return NoteViewModel(dao) as T          // ← use `dao`
+                    return NoteViewModel(dao) as T
                 }
             }
         )[NoteViewModel::class.java]
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     notes = notes,
                     isLoading = isLoading,
                     onTrashNotes = { ids ->
+                        OpenNoteState.requestClose(ids)
                         viewModel.trashNotes(ids)
                     }
                 )

@@ -4,11 +4,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 class NoteViewModel(
@@ -30,6 +32,8 @@ class NoteViewModel(
 
     private val _isTrashed = MutableStateFlow(false)
     val isTrashed: StateFlow<Boolean> = _isTrashed.asStateFlow()
+
+    private var isDeleted = false
 
     init {
         if (noteId != null && noteId != 0) {
@@ -66,28 +70,31 @@ class NoteViewModel(
     fun saveNote(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             debounceTimestampJob?.cancel()
+            if (isDeleted) { onComplete(); return@launch }
 
             val titleText = _title.value.trim()
             val contentText = _content.value.text.trim()
 
-            if (titleText.isEmpty() && contentText.isEmpty()) {
-                currentNote?.let { notesDao.deleteNote(it) }
-                onComplete()
-                return@launch
+            // NonCancellable so the write survives the activity being destroyed
+            withContext(NonCancellable) {
+                if (titleText.isEmpty() && contentText.isEmpty()) {
+                    currentNote?.let { notesDao.deleteNote(it) }
+                    currentNote = null
+                } else {
+                    val finalLastEdit = _lastEdit.value
+                    val noteToSave = NoteItem(
+                        id = currentNote?.id ?: 0,
+                        title = titleText,
+                        content = contentText,
+                        timestamp = currentNote?.timestamp ?: finalLastEdit,
+                        lastEdit = finalLastEdit,
+                        isTrashed = currentNote?.isTrashed ?: false
+                    )
+                    val rowId = notesDao.insertNote(noteToSave)
+                    // remember the generated id so the next save updates this row
+                    currentNote = if (noteToSave.id == 0) noteToSave.copy(id = rowId.toInt()) else noteToSave
+                }
             }
-
-            // 5. Save the latest edited timestamp to the database
-            val finalLastEdit = _lastEdit.value
-            val noteToSave = NoteItem(
-                id = currentNote?.id ?: 0,
-                title = titleText,
-                content = contentText,
-                timestamp = currentNote?.timestamp ?: finalLastEdit,
-                lastEdit = finalLastEdit,
-                isTrashed = currentNote?.isTrashed ?: false
-            )
-
-            notesDao.insertNote(noteToSave)
             onComplete()
         }
     }

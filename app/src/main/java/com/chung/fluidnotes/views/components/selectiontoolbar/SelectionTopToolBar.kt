@@ -1,4 +1,4 @@
-package com.chung.fluidnotes.views.components
+package com.chung.fluidnotes.views.components.selectiontoolbar
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn

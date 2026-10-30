@@ -1,9 +1,9 @@
 package com.chung.fluidnotes.views
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -37,11 +37,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -74,21 +75,64 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.window.embedding.SplitController
+import androidx.window.layout.WindowMetricsCalculator
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.views.components.GradientTopBar
-import com.chung.fluidnotes.views.components.NoteEditDropMenu
+import com.chung.fluidnotes.views.components.dropmenu.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import com.chung.fluidnotes.views.dialogs.DeleteDialog
 import com.chung.fluidnotes.views.dialogs.TrashDialog
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
 import kotlin.time.Duration.Companion.milliseconds
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** Mirrors split_config.xml: min width/smallest width 600dp, no split in tall portrait (aspect > 1.4). */
+private fun displayCanSplit(activity: Activity): Boolean {
+    val bounds = WindowMetricsCalculator.getOrCreate()
+        .computeMaximumWindowMetrics(activity).bounds
+    val density = activity.resources.displayMetrics.density
+    val w = bounds.width() / density
+    val h = bounds.height() / density
+    return minOf(w, h) >= 600f && (w >= h || h / w <= 1.4f)
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@Composable
+private fun rememberIsInSplit(): Boolean {
+    if (LocalInspectionMode.current) return false
+    val activity = LocalContext.current.findActivity() ?: return false
+
+    val predicted = remember(activity) { displayCanSplit(activity) }
+    val inSplit by remember(activity) {
+        SplitController.getInstance(activity)
+            .splitInfoList(activity)
+            .map { splits -> splits.any { it.contains(activity) } }
+            .transformLatest { inSplit ->
+                // The first emission can arrive before the split exists.
+                // Only believe "not in a split" if it stays that way.
+                if (!inSplit) delay(300)
+                emit(inSplit)
+            }
+    }.collectAsState(initial = predicted)
+    return inSplit
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditViewScreen(
+    isInSplit: Boolean = false,
     isExistingNote: Boolean = true,
     isTrashedView: Boolean = false,
     noteTitle: String,
@@ -103,8 +147,7 @@ fun EditViewScreen(
     onShowMenuChange: (Boolean) -> Unit,
     showMenu: Boolean,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+
     val scrollState = rememberScrollState()
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
@@ -135,13 +178,7 @@ fun EditViewScreen(
     val linkColor = AppTheme.controlsTint // read here, in @Composable context
     val linkTransformation = remember(linkColor) { LinkHighlightTransformation(linkColor) }
 
-    val trashLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK){
-
-        }
-    }
+    val isInSplit = rememberIsInSplit()
 
     LaunchedEffect(isContentFocused, imeBottomPx, noteContent.selection, contentTextLayout) {
         if (!isContentFocused || imeBottomPx <= 0) return@LaunchedEffect
@@ -175,7 +212,8 @@ fun EditViewScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(if (isInSplit) MaterialTheme.colorScheme.surfaceContainerLow
+            else MaterialTheme.colorScheme.surface)
             .imePadding()
     ) {
         Column(
@@ -183,7 +221,8 @@ fun EditViewScreen(
                 .fillMaxSize()
                 .onGloballyPositioned { columnHeightPx = it.size.height }
                 .hazeSource(hazeState)
-                .background(MaterialTheme.colorScheme.surface)
+                .background(if (isInSplit) MaterialTheme.colorScheme.surfaceContainerLow
+                else MaterialTheme.colorScheme.surface)
                 .verticalScroll(scrollState)
                 .padding(top = gradientTopBarHeight())
                 .padding(horizontal = 16.dp)
@@ -288,6 +327,7 @@ fun EditViewScreen(
             hazeState = hazeState,
             showBackButton = true,
             onClose = onBackPressed,
+            isInSplit = isInSplit,
             menuContent = {
                 NoteEditDropMenu(
                     hazeState = hazeState,

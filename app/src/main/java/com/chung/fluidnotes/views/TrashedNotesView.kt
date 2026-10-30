@@ -1,10 +1,5 @@
 package com.chung.fluidnotes.views
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -24,7 +19,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,62 +30,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteItem
-import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils.isLargeDevice
+import com.chung.fluidnotes.utils.rememberLastNonEmpty
 import com.chung.fluidnotes.views.components.ActionBarMode
 import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.BottomScrim
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.NoteCard
-import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
+import com.chung.fluidnotes.views.components.NoteCardSkeleton
+import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.TopScrim
+import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionState
 import com.chung.fluidnotes.views.dialogs.DeleteDialog
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
 private enum class TrashContentState { Loading, Empty, Content }
-
-class TrashedNotesActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
-        val dao = (application as FluidNotesApp).database.notesDao()
-
-        val viewModel = ViewModelProvider(
-            this,
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return NoteViewModel(dao) as T          // ← use `dao`
-                }
-            }
-        )[NoteViewModel::class.java]
-
-        setContent {
-            AppTheme {
-                val notes by remember { dao.getAllTrashedNotes() }
-                    .collectAsState(initial = null)
-
-                TrashedNotesView(
-                    notes = notes,
-                    onDeleteNotes = { ids ->
-                        viewModel.deleteNotes(ids)
-                    },
-                    onRestoreNotes = { ids ->
-                        viewModel.restoreNotes(ids)
-                    },
-                    onClose = { finish() }
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun TrashedNotesView(
@@ -100,6 +56,7 @@ fun TrashedNotesView(
     onRestoreNotes: (List<Int>) -> Unit = {},
     onClose: () -> Unit
 ) {
+    val displayedNotes = rememberLastNonEmpty(notes.orEmpty())
     val hazeState = rememberHazeState()
     val context = LocalContext.current
     val isLargeDevice = isLargeDevice()
@@ -115,24 +72,10 @@ fun TrashedNotesView(
 
     var showDeleteDialog by remember {mutableStateOf(false)}
 
-    var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
-    var isSelecting by remember { mutableStateOf(false) }
-
-    fun exitSelection() {
-        isSelecting = false
-        selectedIds = emptySet()
-    }
-
-    fun toggle(id: Int) {
-        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-    }
-
-    BackHandler(enabled = isSelecting) { exitSelection() }
+    val selection = rememberSelectionState()
 
     LaunchedEffect(notes) {
-        val safeNotes = notes.orEmpty()
-        selectedIds = selectedIds intersect safeNotes.map { it.id }.toSet()
-        if (safeNotes.isEmpty()) isSelecting = false
+        selection.retainOnly(notes.orEmpty().map { it.id })
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -201,7 +144,7 @@ fun TrashedNotesView(
                                 }
                             }
                             TrashContentState.Content -> {
-                                val safeNotes = notes.orEmpty()
+                                val safeNotes = displayedNotes
                                 LazyVerticalStaggeredGrid(
                                     columns = columnCells,
                                     state = rememberLazyStaggeredGridState(),
@@ -217,19 +160,11 @@ fun TrashedNotesView(
                                             noteTitle = note.title,
                                             noteContent = note.content,
                                             noteLastEditTimestamp = note.timestamp,
-                                            isSelecting = isSelecting,
-                                            isSelected = note.id in selectedIds,
-                                            onClick = if (isSelecting) ({ toggle(note.id) }) else null,
-                                            onLongClick = {
-                                                isSelecting = true
-                                                toggle(note.id)
-                                            },
-                                            onCheckedChange = {
-                                                if (!isSelecting) {
-                                                    isSelecting = true
-                                                }
-                                                toggle(note.id)
-                                            },
+                                            isSelecting = selection.isSelecting,
+                                            isSelected = note.id in selection.selectedIds,
+                                            onClick = if (selection.isSelecting) ({ selection.toggle(note.id) }) else null,
+                                            onLongClick = { selection.start(note.id) },
+                                            onCheckedChange = { selection.start(note.id) },
                                             modifier = Modifier.animateItem()
                                         )
                                     }
@@ -246,7 +181,7 @@ fun TrashedNotesView(
         TopScrim(Modifier.align(Alignment.TopCenter))
 
         AnimatedContent(
-            targetState = isSelecting,
+            targetState = selection.isSelecting,
             modifier = Modifier.fillMaxWidth(),
             label = "topBarSwap"
         ) { selecting ->
@@ -254,12 +189,13 @@ fun TrashedNotesView(
                 val safeNotes = notes.orEmpty()
                 SelectedItemCountToolbar(
                     hazeState = hazeState,
-                    count = selectedIds.size,
-                    isChecked = safeNotes.isNotEmpty() && selectedIds.size == safeNotes.size,
+                    count = selection.count,
+                    isChecked = safeNotes.isNotEmpty() && selection.count == safeNotes.size,
                     onCheckedChange = { checked ->
-                        selectedIds = if (checked) safeNotes.map { it.id }.toSet() else emptySet()
+                        if (checked) selection.selectAll(safeNotes.map { it.id })
+                        else selection.deselectAll()
                     },
-                    onClose = { exitSelection() }
+                    onClose = { selection.clear() }
                 )
             } else {
                 GradientTopBar(
@@ -275,12 +211,12 @@ fun TrashedNotesView(
 
         if (showDeleteDialog) {
             DeleteDialog(
-                count = selectedIds.count(),
+                count = selection.count,
                 onDismissRequest = { showDeleteDialog = false },
                 onConfirmation = {
-                    onDeleteNotes(selectedIds.toList())
+                    onDeleteNotes(selection.selectedIds.toList())
                     showDeleteDialog = false
-                    exitSelection()
+                    selection.clear()
                 }
             )
         }
@@ -288,13 +224,13 @@ fun TrashedNotesView(
         BottomActionBar(
             hazeState = hazeState,
             mode = ActionBarMode.TrashView,
-            selectedCount = selectedIds.count(),
-            visible = isSelecting,
+            selectedCount = selection.count,
+            visible = selection.isSelecting,
             onDeleteClick = {
                 showDeleteDialog = true
             },
             onRestoreClick = {
-                onRestoreNotes(selectedIds.toList())
+                onRestoreNotes(selection.selectedIds.toList())
             }
         )
     }
