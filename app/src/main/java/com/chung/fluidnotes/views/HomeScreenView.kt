@@ -2,7 +2,6 @@ package com.chung.fluidnotes.views
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.visible
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -69,11 +67,12 @@ import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.GradientTopBar
-import com.chung.fluidnotes.views.components.TopScrim
 import com.chung.fluidnotes.views.components.HomeDropMenu
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
+import com.chung.fluidnotes.views.components.TopScrim
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
+import com.chung.fluidnotes.views.dialogs.TrashDialog
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -85,7 +84,8 @@ private enum class NotesContentState { Loading, Empty, Content }
 fun HomeScreenView(
     modifier: Modifier = Modifier,
     notes: List<NoteItem> = emptyList(),
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    onTrashNotes: (List<Int>) -> Unit = {}
 ) {
     val hazeState = rememberHazeState()
     val context = LocalContext.current
@@ -99,6 +99,7 @@ fun HomeScreenView(
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
+    var showTrashDialog by remember {mutableStateOf(false)}
 
     var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
     var isSelecting by remember { mutableStateOf(false) }
@@ -111,6 +112,7 @@ fun HomeScreenView(
     fun toggle(id: Int) {
         selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
+
 
     BackHandler(enabled = isSelecting) { exitSelection() }
 
@@ -332,10 +334,25 @@ fun HomeScreenView(
             }
         }
 
+        if (showTrashDialog) {
+            TrashDialog(
+                count = selectedIds.count(),
+                onDismissRequest = { showTrashDialog = false },
+                onConfirmation = {
+                    onTrashNotes(selectedIds.toList())
+                    showTrashDialog = false
+                    exitSelection()
+                }
+            )
+        }
+
         BottomActionBar(
             hazeState = hazeState,
             selectedCount = selectedIds.count(),
             visible = isSelecting,
+            onTrashClick = {
+                showTrashDialog = true
+            }
         )
     }
 }

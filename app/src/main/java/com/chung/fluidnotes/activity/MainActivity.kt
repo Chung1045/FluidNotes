@@ -12,7 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.chung.fluidnotes.FluidNotesApp
+import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.views.HomeScreenView
 import com.chung.fluidnotes.views.HomeScreenViewPreview
@@ -27,6 +30,16 @@ class MainActivity : ComponentActivity() {
 
         // Get DAO from Application
         val dao = (application as FluidNotesApp).database.notesDao()
+
+        val viewModel = ViewModelProvider(
+            this,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return NoteViewModel(dao) as T          // ← use `dao`
+                }
+            }
+        )[NoteViewModel::class.java]
 
         setContent {
             AppTheme {
@@ -44,7 +57,10 @@ class MainActivity : ComponentActivity() {
 
                 HomeScreenView(
                     notes = notes,
-                    isLoading = isLoading
+                    isLoading = isLoading,
+                    onTrashNotes = { ids ->
+                        viewModel.trashNotes(ids)
+                    }
                 )
             }
         }

@@ -36,17 +36,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.NoteItem
+import com.chung.fluidnotes.data.NoteViewModel
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils.isLargeDevice
 import com.chung.fluidnotes.views.components.ActionBarMode
 import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.BottomScrim
-import com.chung.fluidnotes.views.components.TopScrim
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.SelectedItemCountToolbar
+import com.chung.fluidnotes.views.components.TopScrim
+import com.chung.fluidnotes.views.dialogs.DeleteDialog
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
@@ -59,14 +63,29 @@ class TrashedNotesActivity : ComponentActivity() {
 
         val dao = (application as FluidNotesApp).database.notesDao()
 
+        val viewModel = ViewModelProvider(
+            this,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return NoteViewModel(dao) as T          // ← use `dao`
+                }
+            }
+        )[NoteViewModel::class.java]
+
         setContent {
             AppTheme {
-
                 val notes by remember { dao.getAllTrashedNotes() }
                     .collectAsState(initial = null)
 
                 TrashedNotesView(
                     notes = notes,
+                    onDeleteNotes = { ids ->
+                        viewModel.deleteNotes(ids)
+                    },
+                    onRestoreNotes = { ids ->
+                        viewModel.restoreNotes(ids)
+                    },
                     onClose = { finish() }
                 )
             }
@@ -77,6 +96,8 @@ class TrashedNotesActivity : ComponentActivity() {
 @Composable
 fun TrashedNotesView(
     notes: List<NoteItem>?,
+    onDeleteNotes: (List<Int>) -> Unit = {},
+    onRestoreNotes: (List<Int>) -> Unit = {},
     onClose: () -> Unit
 ) {
     val hazeState = rememberHazeState()
@@ -91,6 +112,8 @@ fun TrashedNotesView(
         val random = kotlin.random.Random(System.currentTimeMillis())
         List(12) { random.nextInt(120, 231).dp }
     }
+
+    var showDeleteDialog by remember {mutableStateOf(false)}
 
     var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
     var isSelecting by remember { mutableStateOf(false) }
@@ -250,11 +273,29 @@ fun TrashedNotesView(
             }
         }
 
+        if (showDeleteDialog) {
+            DeleteDialog(
+                count = selectedIds.count(),
+                onDismissRequest = { showDeleteDialog = false },
+                onConfirmation = {
+                    onDeleteNotes(selectedIds.toList())
+                    showDeleteDialog = false
+                    exitSelection()
+                }
+            )
+        }
+
         BottomActionBar(
             hazeState = hazeState,
             mode = ActionBarMode.TrashView,
             selectedCount = selectedIds.count(),
             visible = isSelecting,
+            onDeleteClick = {
+                showDeleteDialog = true
+            },
+            onRestoreClick = {
+                onRestoreNotes(selectedIds.toList())
+            }
         )
     }
 }

@@ -23,12 +23,15 @@ interface NotesDAO {
     @Delete
     suspend fun deleteNote(note: NoteItem)
 
+    @Query("DELETE FROM fluidnotes WHERE id IN (:ids)")
+    suspend fun deleteNotes(ids: List<Int>)
+
     @Query("SELECT * FROM fluidnotes WHERE id = :id LIMIT 1")
     suspend fun getNoteById(id: Int): NoteItem?
 
-    @Query("UPDATE fluidnotes SET isTrashed = 1 WHERE id = (:ids)")
+    @Query("UPDATE fluidnotes SET isTrashed = 1 WHERE id IN (:ids)")
     suspend fun setNoteTrashed(ids: List<Int>)
 
-    @Query("UPDATE fluidnotes SET isTrashed = 0 WHERE id = (:ids)")
+    @Query("UPDATE fluidnotes SET isTrashed = 0 WHERE id IN (:ids)")
     suspend fun setNoteUnTrashed(ids: List<Int>)
 }

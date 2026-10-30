@@ -8,7 +8,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -106,6 +105,20 @@ class NoteViewModel(
         }
     }
 
+    fun trashNotes(ids: List<Int>, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            debounceTimestampJob?.cancel()
+            if (ids.isNotEmpty()) {
+                notesDao.setNoteTrashed(ids)
+                currentNote?.id?.takeIf { it in ids }?.let {
+                    currentNote = currentNote?.copy(isTrashed = true)
+                    _isTrashed.value = true
+                }
+            }
+            onComplete()
+        }
+    }
+
     fun restoreNote(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             val id = currentNote?.id ?: noteId?.takeIf { it != 0 }
@@ -118,10 +131,38 @@ class NoteViewModel(
         }
     }
 
+    fun restoreNotes(ids: List<Int>, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            if (ids.isNotEmpty()) {
+                notesDao.setNoteUnTrashed(ids)
+                // Keep single-note state in sync if the currently open note is among them
+                currentNote?.id?.takeIf { it in ids }?.let {
+                    currentNote = currentNote?.copy(isTrashed = false)
+                    _isTrashed.value = false
+                }
+            }
+            onComplete()
+        }
+    }
+
     fun deleteNote(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             currentNote?.let {
                 notesDao.deleteNote(it)
+            }
+            onComplete()
+        }
+    }
+
+    fun deleteNotes(ids: List<Int>, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            if (ids.isNotEmpty()) {
+                notesDao.deleteNotes(ids)
+                // Clear single-note state if the currently open note was deleted
+                currentNote?.id?.takeIf { it in ids }?.let {
+                    currentNote = null
+                    _isTrashed.value = false
+                }
             }
             onComplete()
         }

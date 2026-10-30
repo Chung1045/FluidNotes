@@ -16,18 +16,17 @@ fun TrashDialog(
     AlertDialog(
         title = {
             if (count > 1) {
-                Text("Trash notes")
+                Text("Trash $count notes?")
             } else {
-                Text("Trash note")
+                Text("Trash note?")
             }
         },
         text = {
             if (count > 1) {
-                Text(text = "Are you sure you want to trash $count notes?")
+                Text(text = "Selected notes will be moved to Trashed Notes.")
             } else {
-                Text(text = "Are you sure you want to trash this note?")
+                Text(text = "Selected note will be moved to Trashed Notes.")
             }
-
         },
         onDismissRequest = { onDismissRequest() },
         confirmButton = {

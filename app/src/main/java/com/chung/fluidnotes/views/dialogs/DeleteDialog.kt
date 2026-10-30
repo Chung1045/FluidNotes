@@ -16,16 +16,16 @@ fun DeleteDialog(
     AlertDialog(
         title = {
             if (count > 1) {
-                Text("Delete notes")
+                Text("Delete $count notes?")
             } else {
-                Text("Delete note")
+                Text("Delete note?")
             }
         },
         text = {
             if (count > 1) {
-                Text(text = "Are you sure you want to delete $count notes? You won't be able to recover the deleteed notes.")
+                Text(text = "Selected notes will be gone forever.")
             } else {
-                Text(text = "Are you sure you want to delete this note? You won't be able to recover the deleted note.")
+                Text(text = "Selected note will be gone forever.")
             }
 
         },
