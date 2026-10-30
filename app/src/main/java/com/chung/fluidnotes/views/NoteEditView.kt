@@ -39,6 +39,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,11 +66,13 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -157,7 +161,9 @@ fun EditViewScreen(
     var contentTextLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val contentBringIntoViewRequester = remember { BringIntoViewRequester() }
 
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    // Boolean only: reading the raw pixel value recomposed the editor every keyboard frame
+    val imeInsets = WindowInsets.ime
+    val imeVisible by remember { derivedStateOf { imeInsets.getBottom(density) > 0 } }
     val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
         .asPaddingValues()
         .calculateBottomPadding()
@@ -180,8 +186,8 @@ fun EditViewScreen(
 
     val isInSplit = rememberIsInSplit()
 
-    LaunchedEffect(isContentFocused, imeBottomPx, noteContent.selection, contentTextLayout) {
-        if (!isContentFocused || imeBottomPx <= 0) return@LaunchedEffect
+    LaunchedEffect(isContentFocused, imeVisible, noteContent.selection, contentTextLayout) {
+        if (!isContentFocused || !imeVisible) return@LaunchedEffect
         val layout = contentTextLayout ?: return@LaunchedEffect
         if (columnHeightPx <= 0) return@LaunchedEffect
 
@@ -203,7 +209,7 @@ fun EditViewScreen(
 
     LaunchedEffect(isExistingNote) {
         if (!isExistingNote) {
-            delay(100.milliseconds)
+            withFrameNanos { }   // wait for the first frame instead of a fixed 100ms
             titleFocusRequester.requestFocus()
             keyboardController?.show()
         }
@@ -227,6 +233,17 @@ fun EditViewScreen(
                 .padding(top = gradientTopBarHeight())
                 .padding(horizontal = 16.dp)
         ) {
+            if (isTrashedView) {
+                Text(text = "Read only",
+                    fontSize = 16.sp,
+                    fontStyle = FontStyle.Italic,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             BasicTextField(
                 value = noteTitle,
                 onValueChange = onTitleChange,
@@ -252,7 +269,7 @@ fun EditViewScreen(
                         contentPadding = PaddingValues(vertical = 8.dp),
                         placeholder = {
                             Text(
-                                text = "Title",
+                                text = if (!isExistingNote) "New Note Title" else "Title",
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -266,7 +283,7 @@ fun EditViewScreen(
 
             Text(
                 text = Utils.formatAbsoluteDateTime(noteLastEdit),
-                fontSize = 16.sp,
+                fontSize = 12.sp,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()

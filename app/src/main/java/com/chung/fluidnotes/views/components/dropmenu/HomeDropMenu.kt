@@ -9,7 +9,6 @@ fun HomeDropMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     onSettingsClick: () -> Unit,
-    onHelpClick: () -> Unit,
     onTrashedNotesClick: () -> Unit,
 ) {
     AppDropdownMenu(
@@ -18,7 +17,6 @@ fun HomeDropMenu(
         hazeState = hazeState
     ) {
         AppDropdownMenuItem(text = "Settings", onClick = onSettingsClick)
-        AppDropdownMenuItem(text = "Help & Feedback", onClick = onHelpClick)
         AppDropdownMenuItem(text = "Trashed Notes", onClick = onTrashedNotesClick)
     }
 }

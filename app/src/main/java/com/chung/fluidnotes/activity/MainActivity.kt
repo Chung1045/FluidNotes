@@ -1,6 +1,7 @@
 package com.chung.fluidnotes.activity
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,6 +29,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.isNavigationBarContrastEnforced = false
         super.onCreate(savedInstanceState)
+
+        // This window has no text input. Opt out of input-method focus so tapping it
+        // (e.g. the FAB) doesn't hide the keyboard of the editor in the other pane.
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
 
         // Get DAO from Application
         val dao = (application as FluidNotesApp).database.notesDao()

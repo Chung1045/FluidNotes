@@ -3,11 +3,9 @@ package com.chung.fluidnotes.views
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,50 +19,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
-import com.chung.fluidnotes.R
 import com.chung.fluidnotes.activity.NoteEditViewActivity
 import com.chung.fluidnotes.activity.TrashedNotesActivity
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.utils.rememberLastNonEmpty
 import com.chung.fluidnotes.views.components.BottomActionBar
@@ -78,12 +62,8 @@ import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionState
 import com.chung.fluidnotes.views.dialogs.TrashDialog
-import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlin.time.Duration.Companion.milliseconds
 
 private enum class NotesContentState { Loading, Empty, Content }
 
@@ -98,6 +78,7 @@ fun HomeScreenView(
     val displayedNotes = rememberLastNonEmpty(notes)
     val hazeState = rememberHazeState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val isLargeDevice = Utils.isLargeDevice()
     val columnCells = remember(context) {
         if (isLargeDevice) {
@@ -115,10 +96,10 @@ fun HomeScreenView(
         selection.retainOnly(notes.map { it.id })
     }
 
-    val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
-        .asPaddingValues()
-        .calculateBottomPadding()
-    val fabBottom = max(navBarInset, rememberStableImeBottom())
+    val navBars = WindowInsets.navigationBarsIgnoringVisibility
+    val navBarInset = navBars.asPaddingValues().calculateBottomPadding()
+    val imeInsets = WindowInsets.ime
+    val fabDensity = LocalDensity.current
     val baseScrimHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
 
     Box(modifier = modifier
@@ -137,7 +118,15 @@ fun HomeScreenView(
                 ) {
                     FrostedFAB(
                         modifier = Modifier
-                            .padding(bottom = fabBottom),
+                            // Read in the layout phase: follows the keyboard frame-by-frame
+                            // without recomposing the whole screen.
+                            .offset {
+                                val lift = maxOf(
+                                    navBars.getBottom(fabDensity),
+                                    imeInsets.getBottom(fabDensity)
+                                )
+                                IntOffset(0, -lift)
+                            },
                         hazeState = hazeState,
                         onClick = {
                             val intent = Intent(context, NoteEditViewActivity::class.java).apply {
@@ -306,15 +295,14 @@ fun HomeScreenView(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false },
                             onSettingsClick = { menuExpanded = false },
-                            onHelpClick = { menuExpanded = false },
                             onTrashedNotesClick = {
                                 menuExpanded = false
-                                context.startActivity(
-                                    Intent(
-                                        context,
-                                        TrashedNotesActivity::class.java
-                                    )
-                                )
+                                // Ask the right-pane editor to close, but don't wait for its
+                                // onDestroy - launch Trash right away so there's no delay.
+                                OpenNoteState.openNoteId.value?.let { openId ->
+                                    OpenNoteState.requestClose(listOf(openId))
+                                }
+                                context.startActivity(Intent(context, TrashedNotesActivity::class.java))
                             }
                         )
                     }
@@ -342,77 +330,6 @@ fun HomeScreenView(
                 showTrashDialog = true
             }
         )
-    }
-}
-
-@OptIn(FlowPreview::class)
-@Composable
-private fun rememberStableImeBottom(): Dp {
-    val density = LocalDensity.current
-    val ime = WindowInsets.ime
-    val settled by produceState(initialValue = 0.dp) {
-        snapshotFlow { ime.getBottom(density) }
-            .debounce(350.milliseconds)
-            .collect { value = with(density) { it.toDp() } }
-    }
-    val animated by animateDpAsState(settled, label = "fabImeLift")
-    return animated
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppTopBar(scrollBehavior: TopAppBarScrollBehavior) {
-    var menuExpanded by remember { mutableStateOf(false) }
-
-    TopAppBar(
-        title = {},
-        scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent
-        ),
-        actions = {
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, "More options")
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Settings") },
-                        onClick = { menuExpanded = false })
-                    DropdownMenuItem(
-                        text = { Text("Help & Feedback") },
-                        onClick = { menuExpanded = false })
-                }
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Preview(showBackground = true)
-@Composable
-fun TestAppBarPreview() {
-    val hazeState = remember { HazeState() }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.test_photo),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .hazeSource(state = hazeState)
-        )
-
-        AppTopBar(scrollBehavior = scrollBehavior)
     }
 }
 

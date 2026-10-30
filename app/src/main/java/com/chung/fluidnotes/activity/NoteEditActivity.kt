@@ -38,8 +38,8 @@ class NoteEditViewActivity : ComponentActivity() {
         val isExistingNote = intent.getBooleanExtra("is_existing_note", true)
         val noteId = intent.getIntExtra("note_id", 0)
 
-        if (noteId != 0) OpenNoteState.open(noteId)
-        this.noteId = noteId   // keep it in a property, see below
+        OpenNoteState.open(noteId)   // 0 = new note, still tracked so Trash can close it
+        this.noteId = noteId
 
         lifecycleScope.launch {
             OpenNoteState.closeRequests.collect { ids ->

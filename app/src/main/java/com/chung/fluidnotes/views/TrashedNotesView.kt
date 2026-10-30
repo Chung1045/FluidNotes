@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,10 +39,11 @@ import com.chung.fluidnotes.views.components.ActionBarMode
 import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.BottomScrim
 import com.chung.fluidnotes.views.components.GradientTopBar
+import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.NoteCardSkeleton
-import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.TopScrim
+import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionState
 import com.chung.fluidnotes.views.dialogs.DeleteDialog
 import dev.chrisbanes.haze.hazeSource
@@ -70,7 +72,7 @@ fun TrashedNotesView(
         List(12) { random.nextInt(120, 231).dp }
     }
 
-    var showDeleteDialog by remember {mutableStateOf(false)}
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val selection = rememberSelectionState()
 
@@ -80,60 +82,71 @@ fun TrashedNotesView(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .hazeSource(state = hazeState)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 135.dp, start = 24.dp, end = 24.dp, bottom = 16.dp)
-                ) {
-                    Text(
-                        text = "Trash",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                val contentState = when {
+                    notes == null -> TrashContentState.Loading
+                    notes.isEmpty() -> TrashContentState.Empty
+                    else -> TrashContentState.Content
                 }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .hazeSource(state = hazeState)
-                ) {
-                    val contentState = when {
-                        notes == null -> TrashContentState.Loading
-                        notes.isEmpty() -> TrashContentState.Empty
-                        else -> TrashContentState.Content
-                    }
-                    Crossfade(
-                        targetState = contentState,
-                        modifier = Modifier.fillMaxSize(),
-                        animationSpec = tween(300),
-                        label = "notesContent"
-                    ) { state ->
-                        when (state) {
-                            TrashContentState.Loading -> {
-                                LazyVerticalStaggeredGrid(
-                                    columns = columnCells,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalItemSpacing = 8.dp
-                                ) {
-                                    items(12) { index ->
-                                        NoteCardSkeleton(
-                                            modifier = Modifier.height(
-                                                skeletonHeights[index % skeletonHeights.size]
-                                            )
+                Crossfade(
+                    targetState = contentState,
+                    modifier = Modifier.fillMaxSize(),
+                    animationSpec = tween(300),
+                    label = "notesContent"
+                ) { state ->
+                    when (state) {
+                        TrashContentState.Loading -> {
+                            LazyVerticalStaggeredGrid(
+                                columns = columnCells,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 8.dp
+                            ) {
+                                item(span = StaggeredGridItemSpan.FullLine) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 135.dp, start = 8.dp, end = 8.dp, bottom = 16.dp)
+                                    ) {
+                                        Text(
+                                            text = "Trash",
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
+                                items(12) { index ->
+                                    NoteCardSkeleton(
+                                        modifier = Modifier.height(
+                                            skeletonHeights[index % skeletonHeights.size]
+                                        )
+                                    )
+                                }
                             }
-                            TrashContentState.Empty -> {
+                        }
+                        TrashContentState.Empty -> {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 135.dp, start = 24.dp, end = 24.dp, bottom = 16.dp)
+                                ) {
+                                    Text(
+                                        text = "Trash",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                                 Box(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth(),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -143,38 +156,51 @@ fun TrashedNotesView(
                                     )
                                 }
                             }
-                            TrashContentState.Content -> {
-                                val safeNotes = displayedNotes
-                                LazyVerticalStaggeredGrid(
-                                    columns = columnCells,
-                                    state = rememberLazyStaggeredGridState(),
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalItemSpacing = 8.dp
-                                ) {
-                                    items(safeNotes.size, key = { safeNotes[it].id }) { index ->
-                                        val note = safeNotes[index]
-                                        NoteCard(
-                                            noteId = note.id,
-                                            noteTitle = note.title,
-                                            noteContent = note.content,
-                                            noteLastEditTimestamp = note.timestamp,
-                                            isSelecting = selection.isSelecting,
-                                            isSelected = note.id in selection.selectedIds,
-                                            onClick = if (selection.isSelecting) ({ selection.toggle(note.id) }) else null,
-                                            onLongClick = { selection.start(note.id) },
-                                            onCheckedChange = { selection.start(note.id) },
-                                            modifier = Modifier.animateItem()
+                        }
+                        TrashContentState.Content -> {
+                            val safeNotes = displayedNotes
+                            LazyVerticalStaggeredGrid(
+                                columns = columnCells,
+                                state = rememberLazyStaggeredGridState(),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 78.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 8.dp
+                            ) {
+                                item(span = StaggeredGridItemSpan.FullLine) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 135.dp, start = 8.dp, end = 8.dp, bottom = 16.dp)
+                                    ) {
+                                        Text(
+                                            text = "Trash",
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
+                                }
+                                items(safeNotes.size, key = { safeNotes[it].id }) { index ->
+                                    val note = safeNotes[index]
+                                    NoteCard(
+                                        noteId = note.id,
+                                        noteTitle = note.title,
+                                        noteContent = note.content,
+                                        noteLastEditTimestamp = note.timestamp,
+                                        isSelecting = selection.isSelecting,
+                                        isSelected = note.id in selection.selectedIds,
+                                        onClick = if (selection.isSelecting) ({ selection.toggle(note.id) }) else null,
+                                        onLongClick = { selection.start(note.id) },
+                                        onCheckedChange = { selection.start(note.id) },
+                                        modifier = Modifier.animateItem()
+                                    )
                                 }
                             }
                         }
                     }
-
-                    BottomScrim(Modifier.align(Alignment.BottomCenter))
                 }
+
+                BottomScrim(Modifier.align(Alignment.BottomCenter))
             }
         }
 
@@ -199,6 +225,7 @@ fun TrashedNotesView(
                 )
             } else {
                 GradientTopBar(
+                    topBarMode = GradientTopBarMode.Actionless,
                     hazeState = hazeState,
                     showScrim = false,
                     showBackButton = true,
