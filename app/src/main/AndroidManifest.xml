@@ -40,6 +40,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".activity.SettingsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".activity.ShareReceiverActivity"
             android:excludeFromRecents="true"
             android:exported="true"

@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chung.fluidnotes.activity.NoteEditViewActivity
+import com.chung.fluidnotes.activity.SettingsActivity
 import com.chung.fluidnotes.activity.TrashedNotesActivity
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
@@ -294,7 +295,10 @@ fun HomeScreenView(
                             hazeState = hazeState,
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false },
-                            onSettingsClick = { menuExpanded = false },
+                            onSettingsClick = {
+                                menuExpanded = false
+                                context.startActivity(Intent(context, SettingsActivity::class.java))
+                            },
                             onTrashedNotesClick = {
                                 menuExpanded = false
                                 // Ask the right-pane editor to close, but don't wait for its

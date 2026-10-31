@@ -1,0 +1,24 @@
+package com.chung.fluidnotes.activity
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import com.chung.fluidnotes.ui.theme.AppTheme
+import com.chung.fluidnotes.views.SettingsView
+
+class SettingsActivity: ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        setContent {
+            AppTheme {
+                SettingsView(
+                    onClose = {
+                        finish()
+                    }
+                )
+            }
+        }
+    }
+}
