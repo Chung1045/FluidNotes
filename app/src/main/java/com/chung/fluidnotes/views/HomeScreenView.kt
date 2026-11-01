@@ -1,5 +1,6 @@
 package com.chung.fluidnotes.views
 
+import android.app.Activity
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -44,6 +45,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.chung.fluidnotes.activity.NoteEditViewActivity
 import com.chung.fluidnotes.activity.SettingsActivity
 import com.chung.fluidnotes.activity.TrashedNotesActivity
@@ -79,6 +82,7 @@ fun HomeScreenView(
     val displayedNotes = rememberLastNonEmpty(notes)
     val hazeState = rememberHazeState()
     val context = LocalContext.current
+    val activity = context as Activity
     val scope = rememberCoroutineScope()
     val isLargeDevice = Utils.isLargeDevice()
     val columnCells = remember(context) {
@@ -297,12 +301,19 @@ fun HomeScreenView(
                             onDismissRequest = { menuExpanded = false },
                             onSettingsClick = {
                                 menuExpanded = false
+                                activity.let {
+                                    WindowInsetsControllerCompat(it.window, it.window.decorView).hide(
+                                        WindowInsetsCompat.Type.ime())
+                                }
                                 context.startActivity(Intent(context, SettingsActivity::class.java))
                             },
                             onTrashedNotesClick = {
                                 menuExpanded = false
                                 // Ask the right-pane editor to close, but don't wait for its
                                 // onDestroy - launch Trash right away so there's no delay.
+                                activity.let {
+                                    WindowInsetsControllerCompat(it.window, it.window.decorView).hide(WindowInsetsCompat.Type.ime())
+                                }
                                 OpenNoteState.openNoteId.value?.let { openId ->
                                     OpenNoteState.requestClose(listOf(openId))
                                 }

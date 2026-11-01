@@ -22,6 +22,8 @@
     <ActivityRule window:alwaysExpand="true">
         <ActivityFilter
             window:activityName="com.chung.fluidnotes.activity.TrashedNotesActivity" />
+        <ActivityFilter
+            window:activityName="com.chung.fluidnotes.activity.SettingsActivity" />
     </ActivityRule>
 
 </resources>

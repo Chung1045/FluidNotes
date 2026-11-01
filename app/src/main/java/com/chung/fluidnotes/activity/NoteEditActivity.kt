@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -95,7 +97,11 @@ class NoteEditViewActivity : ComponentActivity() {
                     onContentChange = viewModel::onContentChange,
                     onBackPressed = {
                         if (isTrashed) finish()
-                        else viewModel.saveNote { finish() }
+                        else viewModel.saveNote {
+                            WindowInsetsControllerCompat(window, window.decorView).hide(
+                                WindowInsetsCompat.Type.ime())
+                            finish()
+                        }
                     },
                     onTrashConfirmed = { viewModel.trashNote { finish() } },
                     onDeleteConfirmed = {viewModel.deleteNote { finish() } },

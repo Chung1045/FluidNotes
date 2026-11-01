@@ -343,7 +343,10 @@ fun EditViewScreen(
         GradientTopBar(
             hazeState = hazeState,
             showBackButton = true,
-            onClose = onBackPressed,
+            onClose = {
+                keyboardController?.hide()
+                onBackPressed()
+            },
             isInSplit = isInSplit,
             menuContent = {
                 NoteEditDropMenu(
