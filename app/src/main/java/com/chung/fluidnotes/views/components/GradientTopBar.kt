@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -123,8 +124,10 @@ fun BoxScope.GradientTopBar(
     isInSplit: Boolean = false,
     showMenu: Boolean = false,
     showBackButton: Boolean = true,
+    showDrawerButton: Boolean = false,
     showScrim: Boolean = true,
     modifier: Modifier = Modifier,
+    onDrawerClick: () -> Unit = {},
     onShowMenuChange: (Boolean) -> Unit = {},
     onClose: () -> Unit = {},
     menuContent: @Composable () -> Unit = {},
@@ -163,7 +166,14 @@ fun BoxScope.GradientTopBar(
                     .padding(top = topPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (showBackButton) {
+                if (showDrawerButton) {
+                    FrostedIconButton(
+                        onClick = onDrawerClick,
+                        icon = Icons.Filled.Menu,
+                        contentDescription = "Open Menu",
+                        hazeState = if (isLowEnd) null else hazeState
+                    )
+                } else if (showBackButton) {
                     IconButton(
                         onClick = { onClose() },
                         modifier = Modifier

@@ -1,6 +1,10 @@
 package com.chung.fluidnotes.ui.theme
 
-import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,14 +13,16 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.chung.fluidnotes.FluidNotesApp
 import com.chung.fluidnotes.data.AppThemeMode
 import com.chung.fluidnotes.data.SettingsStore
@@ -74,15 +80,27 @@ fun AppTheme(
         else -> LightColorScheme
     }
 
-    // Keep status/navigation bar icons readable when the in-app theme differs from the system theme
+    // Keep status/navigation bar icons readable when the in-app theme differs from the system theme.
+    // enableEdgeToEdge() decides icon colour from `darkTheme` here (not the system), and it is
+    // re-applied on every ON_RESUME so coming back from another activity can't leave stale icons.
     val view = LocalView.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+        val activity = remember(view) { view.context.findComponentActivity() }
+        DisposableEffect(activity, lifecycleOwner, darkTheme) {
+            fun applySystemBars() {
+                val transparent = android.graphics.Color.TRANSPARENT
+                activity?.enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(transparent, transparent) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(transparent, transparent) { darkTheme }
+                )
             }
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) applySystemBars()
+            }
+            applySystemBars()
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
     }
 
@@ -91,6 +109,15 @@ fun AppTheme(
         typography = Typography,
         content = content
     )
+}
+
+private fun Context.findComponentActivity(): ComponentActivity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is ComponentActivity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
 object AppTheme {

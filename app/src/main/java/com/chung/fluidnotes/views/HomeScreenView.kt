@@ -2,6 +2,7 @@ package com.chung.fluidnotes.views
 
 import android.app.Activity
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -25,11 +26,14 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,9 +59,11 @@ import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.utils.Utils
 import com.chung.fluidnotes.utils.rememberLastNonEmpty
+import com.chung.fluidnotes.views.components.AppNavDrawer
 import com.chung.fluidnotes.views.components.BottomActionBar
 import com.chung.fluidnotes.views.components.FrostedFAB
 import com.chung.fluidnotes.views.components.GradientTopBar
+import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.NoteCardSkeleton
 import com.chung.fluidnotes.views.components.TopScrim
@@ -68,6 +74,7 @@ import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionS
 import com.chung.fluidnotes.views.dialogs.TrashDialog
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.launch
 
 private enum class NotesContentState { Loading, Empty, Content }
 
@@ -93,9 +100,35 @@ fun HomeScreenView(
         }
     }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerActive by remember {
+        derivedStateOf {
+            drawerState.currentValue == DrawerValue.Open || drawerState.isAnimationRunning
+        }
+    }
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
     var showTrashDialog by remember { mutableStateOf(false) }
     val selection = rememberSelectionState()
+
+    val onSettingsClick = {
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            .hide(WindowInsetsCompat.Type.ime())
+        context.startActivity(Intent(context, SettingsActivity::class.java))
+    }
+
+    val onTrashedNotesClick = {
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            .hide(WindowInsetsCompat.Type.ime())
+        // Ask the right-pane editor to close, but don't wait for its
+        // onDestroy - launch Trash right away so there's no delay.
+        OpenNoteState.openNoteId.value?.let { openId ->
+            OpenNoteState.requestClose(listOf(openId))
+        }
+        context.startActivity(Intent(context, TrashedNotesActivity::class.java))
+    }
 
     LaunchedEffect(notes) {
         selection.retainOnly(notes.map { it.id })
@@ -107,246 +140,237 @@ fun HomeScreenView(
     val fabDensity = LocalDensity.current
     val baseScrimHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
 
-    Box(modifier = modifier
-        .fillMaxSize()
-        .background(MaterialTheme.colorScheme.background)
+    AppNavDrawer(
+        hazeState = hazeState,
+        drawerState = drawerState,
+        gesturesEnabled = !selection.isSelecting,
+        onSettingsClick = onSettingsClick,
+        onTrashedNotesClick = onTrashedNotesClick
     ) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
 
-        Scaffold(
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            floatingActionButton = {
-                AnimatedVisibility(
-                    visible = !selection.isSelecting,
-                    enter = fadeIn(animationSpec = tween(200)),
-                    exit = fadeOut(animationSpec = tween(200))
-                ) {
-                    FrostedFAB(
-                        modifier = Modifier
-                            // Read in the layout phase: follows the keyboard frame-by-frame
-                            // without recomposing the whole screen.
-                            .offset {
-                                val lift = maxOf(
-                                    navBars.getBottom(fabDensity),
-                                    imeInsets.getBottom(fabDensity)
-                                )
-                                IntOffset(0, -lift)
-                            },
-                        hazeState = hazeState,
-                        onClick = {
-                            val intent = Intent(context, NoteEditViewActivity::class.java).apply {
-                                putExtra("is_existing_note", false)
-                                putExtra("note_id", 0)
+            Scaffold(
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                floatingActionButton = {
+                    AnimatedVisibility(
+                        visible = !selection.isSelecting,
+                        enter = fadeIn(animationSpec = tween(200)),
+                        exit = fadeOut(animationSpec = tween(200))
+                    ) {
+                        FrostedFAB(
+                            modifier = Modifier
+                                // Read in the layout phase: follows the keyboard frame-by-frame
+                                // without recomposing the whole screen.
+                                .offset {
+                                    val lift = maxOf(
+                                        navBars.getBottom(fabDensity),
+                                        imeInsets.getBottom(fabDensity)
+                                    )
+                                    IntOffset(0, -lift)
+                                },
+                            hazeState = hazeState,
+                            onClick = {
+                                val intent =
+                                    Intent(context, NoteEditViewActivity::class.java).apply {
+                                        putExtra("is_existing_note", false)
+                                        putExtra("note_id", 0)
+                                    }
+                                context.startActivity(intent)
                             }
-                            context.startActivity(intent)
+                        )
+                    }
+                }
+            ) { _ ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .hazeSource(hazeState),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    val contentState = when {
+                        isLoading -> NotesContentState.Loading
+                        notes.isEmpty() -> NotesContentState.Empty
+                        else -> NotesContentState.Content
+                    }
+                    Crossfade(
+                        targetState = contentState,
+                        modifier = Modifier.fillMaxSize(),
+                        animationSpec = tween(300),
+                        label = "notesContent"
+                    ) { state ->
+                        when (state) {
+                            NotesContentState.Loading -> {
+                                // Random card height for skeleton note cards
+                                val skeletonHeights = remember {
+                                    val random = kotlin.random.Random(System.currentTimeMillis())
+                                    // Generates 12 random heights between 120.dp and 230.dp
+                                    List(12) { random.nextInt(120, 231).dp }
+                                }
+
+                                // Display staggered grid with skeleton cards while loading
+                                LazyVerticalStaggeredGrid(
+                                    columns = columnCells,
+                                    state = rememberLazyStaggeredGridState(),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = gradientTopBarHeight() + 8.dp,
+                                        bottom = 80.dp + navBarInset
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalItemSpacing = 8.dp
+                                ) {
+                                    items(12) { index ->
+                                        NoteCardSkeleton(
+                                            modifier = Modifier.height(
+                                                skeletonHeights[index % skeletonHeights.size]
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            NotesContentState.Empty -> {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(
+                                        8.dp,
+                                        Alignment.CenterVertically
+                                    )
+                                ) {
+                                    Text(
+                                        text = "No notes",
+                                        fontSize = 18.sp,
+                                        color = AppTheme.controlsForeground,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        text = "Create new note",
+                                        fontSize = 14.sp,
+                                        color = AppTheme.controlsForeground.copy(alpha = 0.6f),
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                            }
+
+                            NotesContentState.Content -> {
+                                LazyVerticalStaggeredGrid(
+                                    columns = columnCells,
+                                    state = rememberLazyStaggeredGridState(),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = gradientTopBarHeight() + 8.dp,
+                                        bottom = 80.dp + navBarInset
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalItemSpacing = 8.dp
+                                ) {
+                                    items(
+                                        items = displayedNotes,
+                                        key = { it.id }
+                                    ) { note ->
+                                        NoteCard(
+                                            noteId = note.id,
+                                            noteTitle = note.title,
+                                            noteContent = note.content,
+                                            noteLastEditTimestamp = note.timestamp,
+                                            isSelecting = selection.isSelecting,
+                                            isSelected = note.id in selection.selectedIds,
+                                            onClick = when {
+                                                drawerActive -> ({})
+                                                selection.isSelecting -> ({ selection.toggle(note.id) })
+                                                else -> null
+                                            },
+                                            onLongClick = { if (!drawerActive) selection.start(note.id) },
+                                            onCheckedChange = { if (!drawerActive) selection.start(note.id) },
+                                            modifier = Modifier.animateItem()
+                                        )
+                                    }
+                                }
+                            }
                         }
+                    }
+
+                    // Bottom scrim
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(baseScrimHeight + navBarInset)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 1f)
+                                    )
+                                )
+                            )
                     )
                 }
             }
-        ) { _ ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .hazeSource(hazeState),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                val contentState = when {
-                    isLoading -> NotesContentState.Loading
-                    notes.isEmpty() -> NotesContentState.Empty
-                    else -> NotesContentState.Content
-                }
-                Crossfade(
-                    targetState = contentState,
-                    modifier = Modifier.fillMaxSize(),
-                    animationSpec = tween(300),
-                    label = "notesContent"
-                ) { state ->
-                    when (state) {
-                        NotesContentState.Loading -> {
-                            // Random card height for skeleton note cards
-                            val skeletonHeights = remember {
-                                val random = kotlin.random.Random(System.currentTimeMillis())
-                                // Generates 12 random heights between 120.dp and 230.dp
-                                List(12) { random.nextInt(120, 231).dp }
-                            }
 
-                            // Display staggered grid with skeleton cards while loading
-                            LazyVerticalStaggeredGrid(
-                                columns = columnCells,
-                                state = rememberLazyStaggeredGridState(),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = gradientTopBarHeight() + 8.dp,
-                                    bottom = 80.dp + navBarInset
-                                ),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalItemSpacing = 8.dp
-                            ) {
-                                items(12) {  index ->
-                                    NoteCardSkeleton(
-                                        modifier = Modifier.height(
-                                            skeletonHeights[index % skeletonHeights.size]
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                        NotesContentState.Empty -> {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
-                            ) {
-                                Text(
-                                    text = "No notes",
-                                    fontSize = 18.sp,
-                                    color = AppTheme.controlsForeground,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Text(
-                                    text = "Create new note",
-                                    fontSize = 14.sp,
-                                    color = AppTheme.controlsForeground.copy(alpha = 0.6f),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                        NotesContentState.Content -> {
-                            LazyVerticalStaggeredGrid(
-                                columns = columnCells,
-                                state = rememberLazyStaggeredGridState(),
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = gradientTopBarHeight() + 8.dp,
-                                    bottom = 80.dp + navBarInset
-                                ),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalItemSpacing = 8.dp
-                            ) {
-                                items(
-                                    items = displayedNotes,
-                                    key = { it.id }
-                                ) { note ->
-                                    NoteCard(
-                                        noteId = note.id,
-                                        noteTitle = note.title,
-                                        noteContent = note.content,
-                                        noteLastEditTimestamp = note.timestamp,
-                                        isSelecting = selection.isSelecting,
-                                        isSelected = note.id in selection.selectedIds,
-                                        onClick = if (selection.isSelecting) ({ selection.toggle(note.id) }) else null,
-                                        onLongClick = { selection.start(note.id) },
-                                        onCheckedChange = { selection.start(note.id) },
-                                        modifier = Modifier.animateItem()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+            TopScrim(Modifier.align(Alignment.TopCenter))
 
-                // Bottom scrim
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(baseScrimHeight + navBarInset)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 1f)
-                                )
-                            )
-                        )
-                )
+            Crossfade(
+                targetState = selection.isSelecting,
+                modifier = Modifier.fillMaxWidth(),
+                label = "topBarSwap"
+            ) { selecting ->
+                if (selecting) {
+                    SelectedItemCountToolbar(
+                        hazeState = hazeState,
+                        count = selection.count,
+                        isChecked = notes.isNotEmpty() && selection.count == notes.size,
+                        onCheckedChange = { checked ->
+                            if (checked) selection.selectAll(notes.map { it.id })
+                            else selection.deselectAll()
+                        },
+                        onClose = { selection.clear() }
+                    )
+                } else {
+                    GradientTopBar(
+                        topBarMode = GradientTopBarMode.Actionless,
+                        hazeState = hazeState,
+                        showBackButton = false,
+                        showDrawerButton = true,
+                        onDrawerClick = { scope.launch { drawerState.open() } }
+                    )
+                }
             }
-        }
 
-        TopScrim(Modifier.align(Alignment.TopCenter))
-
-        Crossfade (
-            targetState = selection.isSelecting,
-            modifier = Modifier.fillMaxWidth(),
-            label = "topBarSwap"
-        ) { selecting ->
-            if (selecting) {
-                SelectedItemCountToolbar(
-                    hazeState = hazeState,
+            if (showTrashDialog) {
+                TrashDialog(
                     count = selection.count,
-                    isChecked = notes.isNotEmpty() && selection.count == notes.size,
-                    onCheckedChange = { checked ->
-                        if (checked) selection.selectAll(notes.map { it.id })
-                        else selection.deselectAll()
-                    },
-                    onClose = { selection.clear() }
-                )
-            } else {
-                // GradientTopBar
-                GradientTopBar(
-                    hazeState = hazeState,
-                    showScrim = false,
-                    showBackButton = false,
-                    showMenu = menuExpanded,
-                    onShowMenuChange = { menuExpanded = it },
-                    onClose = {},
-                    menuContent = {
-                        HomeDropMenu(
-                            hazeState = hazeState,
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false },
-                            onSettingsClick = {
-                                menuExpanded = false
-                                activity.let {
-                                    WindowInsetsControllerCompat(it.window, it.window.decorView).hide(
-                                        WindowInsetsCompat.Type.ime())
-                                }
-                                context.startActivity(Intent(context, SettingsActivity::class.java))
-                            },
-                            onTrashedNotesClick = {
-                                menuExpanded = false
-                                // Ask the right-pane editor to close, but don't wait for its
-                                // onDestroy - launch Trash right away so there's no delay.
-                                activity.let {
-                                    WindowInsetsControllerCompat(it.window, it.window.decorView).hide(WindowInsetsCompat.Type.ime())
-                                }
-                                OpenNoteState.openNoteId.value?.let { openId ->
-                                    OpenNoteState.requestClose(listOf(openId))
-                                }
-                                context.startActivity(Intent(context, TrashedNotesActivity::class.java))
-                            }
-                        )
+                    onDismissRequest = { showTrashDialog = false },
+                    onConfirmation = {
+                        onTrashNotes(selection.selectedIds.toList())
+                        showTrashDialog = false
+                        selection.clear()
                     }
                 )
             }
-        }
 
-        if (showTrashDialog) {
-            TrashDialog(
-                count = selection.count,
-                onDismissRequest = { showTrashDialog = false },
-                onConfirmation = {
-                    onTrashNotes(selection.selectedIds.toList())
-                    showTrashDialog = false
-                    selection.clear()
+            BottomActionBar(
+                hazeState = hazeState,
+                selectedCount = selection.count,
+                visible = selection.isSelecting,
+                onTrashClick = {
+                    showTrashDialog = true
                 }
             )
         }
-
-        BottomActionBar(
-            hazeState = hazeState,
-            selectedCount = selection.count,
-            visible = selection.isSelecting,
-            onTrashClick = {
-                showTrashDialog = true
-            }
-        )
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
