@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.chung.fluidnotes"
-        minSdk = 34
+        minSdk = 31
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -74,6 +74,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.window)
+    implementation(libs.androidx.datastore.preferences)
 
     // REQUIRED for Room code generation
     ksp(libs.androidx.room3.compiler)

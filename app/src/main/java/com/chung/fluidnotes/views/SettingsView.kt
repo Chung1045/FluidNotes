@@ -21,10 +21,10 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chung.fluidnotes.data.AppThemeMode
+import com.chung.fluidnotes.data.SettingsStore
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils.isLargeDevice
 import com.chung.fluidnotes.views.components.BottomScrim
@@ -40,6 +42,7 @@ import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.TopScrim
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsView(
@@ -47,6 +50,7 @@ fun SettingsView(
 ) {
     val hazeState = rememberHazeState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val largeDevice = isLargeDevice()
 
     val columnCells = remember(context, largeDevice) {
@@ -54,9 +58,10 @@ fun SettingsView(
         else GridCells.Adaptive(160.dp)
     }
 
+    val settingsStore = remember { SettingsStore(context.applicationContext) }
+    val followSystemTheme by settingsStore.followSystemTheme.collectAsState(initial = true)
+    val selectedTheme by settingsStore.themeStyle.collectAsState(initial = AppThemeMode.LIGHT)
     // States for theme preferences
-    var followSystemTheme by remember { mutableStateOf(true) }
-    var selectedTheme by remember { mutableStateOf("light") } // "light" or "dark"
 
     Box(
         modifier = Modifier
@@ -102,7 +107,7 @@ fun SettingsView(
                     // 1. Follow System Theme (Switch)
                     SettingsRow(
                         position = SettingsRowPosition.Top,
-                        onClick = { followSystemTheme = !followSystemTheme }
+                        onClick = { scope.launch { settingsStore.setFollowSystemTheme(!followSystemTheme) } }
                     ) {
                         Text(
                             text = "Follow System Theme",
@@ -112,7 +117,7 @@ fun SettingsView(
 
                         Switch(
                             checked = followSystemTheme,
-                            onCheckedChange = { followSystemTheme = it }
+                            onCheckedChange = { scope.launch { settingsStore.setFollowSystemTheme(it) }}
                         )
                     }
 
@@ -120,9 +125,9 @@ fun SettingsView(
                     SettingsRow(
                         position = SettingsRowPosition.Middle,
                         onClick = {
-                            followSystemTheme = false
-                            selectedTheme = "light"
-                        }
+                            scope.launch { settingsStore.setThemeStyle(AppThemeMode.LIGHT) }
+                        },
+                        enabled = !followSystemTheme
                     ) {
                         Text(
                             text = "Light Theme",
@@ -135,7 +140,7 @@ fun SettingsView(
                         )
 
                         RadioButton(
-                            selected = !followSystemTheme && selectedTheme == "light",
+                            selected = selectedTheme == AppThemeMode.LIGHT,
                             onClick = null, // Row's clickable modifier handles selection
                             enabled = !followSystemTheme
                         )
@@ -145,9 +150,9 @@ fun SettingsView(
                     SettingsRow(
                         position = SettingsRowPosition.Bottom,
                         onClick = {
-                            followSystemTheme = false
-                            selectedTheme = "dark"
-                        }
+                            scope.launch { settingsStore.setThemeStyle(AppThemeMode.DARK) }
+                        },
+                        enabled = !followSystemTheme
                     ) {
                         Text(
                             text = "Dark Theme",
@@ -160,7 +165,7 @@ fun SettingsView(
                         )
 
                         RadioButton(
-                            selected = !followSystemTheme && selectedTheme == "dark",
+                            selected = selectedTheme == AppThemeMode.DARK,
                             onClick = null, // Row's clickable modifier handles selection
                             enabled = !followSystemTheme
                         )
@@ -236,6 +241,7 @@ fun SettingsCategoryLabel(
 private fun SettingsRow(
     modifier: Modifier = Modifier,
     position: SettingsRowPosition = SettingsRowPosition.Single,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit
 ) {
@@ -249,7 +255,10 @@ private fun SettingsRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(SettingsRowHeight)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .then(
+                    if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick)
+                    else Modifier
+                )
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
