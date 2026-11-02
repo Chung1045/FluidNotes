@@ -71,7 +71,8 @@ fun FrostedFAB(
     ) {
         Icon(
             imageVector = Icons.Filled.Add,
-            contentDescription = "Add note"
+            contentDescription = "Add note",
+            tint = AppTheme.controlsForeground
         )
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -34,7 +35,7 @@ fun FrostedIconButton(
     backgroundColor: Color = AppTheme.controlsBackground,
     tint: Color = AppTheme.controlsForeground
 ) {
-    val buttonSize = (48 * Utils.getUIScale()).dp
+    val buttonSize = (48 * getUIScale()).dp
     val blurTexture = AppTheme.frostedTexture
     val context = LocalContext.current
     val isLowEnd = remember(context) { Utils.isLowEndDevice(context) }

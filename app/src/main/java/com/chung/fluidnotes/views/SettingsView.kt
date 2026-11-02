@@ -1,5 +1,10 @@
 package com.chung.fluidnotes.views
 
+/* Note:
+    If BuildConfig is left un-resolved, please assemble the project first
+    At: Build > Assemble Project
+*/
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +21,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -23,25 +31,36 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chung.fluidnotes.BuildConfig
 import com.chung.fluidnotes.data.AppThemeMode
 import com.chung.fluidnotes.data.SettingsStore
 import com.chung.fluidnotes.ui.theme.AppTheme
-import com.chung.fluidnotes.utils.Utils.isLargeDevice
+import com.chung.fluidnotes.utils.AppConfig
+import com.chung.fluidnotes.utils.UpdateChecker
+import com.chung.fluidnotes.utils.UpdateResult
+import com.chung.fluidnotes.utils.isLargeDevice
 import com.chung.fluidnotes.views.components.BottomScrim
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.TopScrim
+import com.chung.fluidnotes.views.dialogs.UpdateDialog
+import com.chung.fluidnotes.views.dialogs.UpdateState
+import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,10 +82,15 @@ fun SettingsView(
     val selectedTheme by settingsStore.themeStyle.collectAsState(initial = AppThemeMode.LIGHT)
     // States for theme preferences
 
+    var updateState by remember { mutableStateOf<UpdateState?>(null) }
+    var updateJob by remember { mutableStateOf<Job?>(null) }
+    val uriHandler = LocalUriHandler.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
+            .hazeSource(hazeState)
     ) {
         GradientTopBar(
             hazeState = hazeState,
@@ -117,7 +141,7 @@ fun SettingsView(
 
                         Switch(
                             checked = followSystemTheme,
-                            onCheckedChange = { scope.launch { settingsStore.setFollowSystemTheme(it) }}
+                            onCheckedChange = { scope.launch { settingsStore.setFollowSystemTheme(it) } }
                         )
                     }
 
@@ -183,7 +207,7 @@ fun SettingsView(
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(text = "Version", color = AppTheme.controlsForeground)
                             Text(
-                                text = "0.9-Dev",
+                                text = BuildConfig.VERSION_NAME,
                                 fontSize = 12.sp,
                                 lineHeight = 12.sp,
                                 color = AppTheme.controlsForeground.copy(alpha = 0.6f)
@@ -192,12 +216,47 @@ fun SettingsView(
                     }
 
                     SettingsRow(
-                        position = SettingsRowPosition.Bottom,
-                        onClick = {}
+                        position = SettingsRowPosition.Middle,
+                        onClick = {
+                            updateJob?.cancel()
+                            updateState = UpdateState.Checking
+                            updateJob = scope.launch {
+                                updateState = when (val result =
+                                    UpdateChecker.check(BuildConfig.VERSION_NAME)) {
+                                    is UpdateResult.UpToDate -> UpdateState.UpToDate
+                                    is UpdateResult.NewRelease -> UpdateState.NewRelease(
+                                        result.version,
+                                        result.url,
+                                        result.notes
+                                    )
+
+                                    is UpdateResult.Failed -> UpdateState.Error
+                                }
+                            }
+                        }
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(text = "Check for updates", color = AppTheme.controlsForeground)
                         }
+                    }
+
+                    SettingsRow(
+                        position = SettingsRowPosition.Bottom,
+                        onClick = {
+                            uriHandler.openUri(AppConfig.REPO_URL)
+                        }
+                    ) {
+                        Text(
+                            text = "View on GitHub",
+                            color = AppTheme.controlsForeground,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                            contentDescription = "Open GitHub repo url",
+                            tint = AppTheme.controlsForeground
+                        )
                     }
                 }
             }
@@ -207,8 +266,22 @@ fun SettingsView(
         BottomScrim(Modifier.align(Alignment.BottomCenter))
 
         TopScrim(Modifier.align(Alignment.TopCenter))
+
+        updateState?.let { state ->
+            UpdateDialog(
+                hazeState = hazeState,
+                state = state,
+                currentVersion = BuildConfig.VERSION_NAME,
+                onDismiss = {
+                    updateJob?.cancel()
+                    updateJob = null
+                    updateState = null
+                }
+            )
+        }
     }
 }
+
 
 // Two-line rows (e.g. Version + subtitle) need ~44dp of content plus padding, so 54dp was too tight
 private val SettingsRowHeight = 60.dp

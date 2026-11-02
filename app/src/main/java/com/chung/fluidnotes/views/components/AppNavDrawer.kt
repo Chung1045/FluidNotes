@@ -44,7 +44,7 @@ fun AppNavDrawer(
     drawerState: DrawerState,
     onSettingsClick: () -> Unit,
     onTrashedNotesClick: () -> Unit,
-    hazeState: HazeState? = null,
+    hazeState: HazeState,
     gesturesEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -71,6 +71,7 @@ fun AppNavDrawer(
         gesturesEnabled = gesturesEnabled,
         drawerContent = {
             ModalDrawerSheet(
+                modifier = Modifier.width(300.dp),
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp,
                 // Insets are handled inside the glass Column so the blur extends under the system bars
@@ -80,17 +81,15 @@ fun AppNavDrawer(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
-                            if (!isLowEnd && hazeState != null) {
+                            if (!isLowEnd) {
                                 Modifier.hazeBlur(
                                     input = HazeInput.Sources(hazeState),
-                                    style = blurTexture.then { blurRadius(20.dp) },
+                                    style = blurTexture.then { blurRadius(35.dp) },
                                     performanceMode = HazePerformanceMode.Performance
                                 )
-                            } else Modifier
-                        )
-                        .background(
-                            if (isLowEnd || hazeState == null) AppTheme.controlsBackground.copy(alpha = 0.92f)
-                            else AppTheme.controlsBackground
+                            } else {
+                                Modifier.background(AppTheme.controlsBackground.copy(alpha = 1f))
+                            }
                         )
                         .statusBarsPadding()
                         .navigationBarsPadding()
@@ -125,6 +124,8 @@ fun AppNavDrawer(
                 }
             }
         },
+        // The root-level hazeBlur was removed: it wrapped the hazeSource it was sampling
+        // (ancestor of its own source), so it either blurred nothing or fought the sheet's blur.
         content = content
     )
 }

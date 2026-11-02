@@ -2,44 +2,13 @@ package com.chung.fluidnotes.utils
 
 import android.app.ActivityManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.MediaStore
-import android.provider.Settings
 import android.util.Patterns
-import androidx.activity.compose.LocalActivity
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.IntentSenderRequest
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
-import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.core.net.toUri
-import com.chung.fluidnotes.ui.theme.AppTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 object Utils {
-
-    @Composable
-    fun isLargeDevice(): Boolean {
-        val configuration = LocalConfiguration.current
-        // Use smallestScreenWidthDp to get a stable indicator of device class
-        // (e.g., typically >= 600dp for tablets/foldables)
-        val smallestWidth = configuration.smallestScreenWidthDp
-
-        return smallestWidth >= 600
-    }
 
     fun isLowEndDevice(context: Context): Boolean {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -57,15 +26,6 @@ object Utils {
         if (Runtime.getRuntime().availableProcessors() <= 4) return true
 
         return false
-    }
-
-    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-    @Composable
-    fun getUIScale(): Float {
-        val activity = LocalActivity.current
-        val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
-        val isTablet = windowSizeClass?.widthSizeClass != WindowWidthSizeClass.Compact
-        return if (isTablet) 1.05f else 1f
     }
 
     fun formatRelativeTime(timestampMillis: Long): String {
@@ -116,7 +76,7 @@ object Utils {
         "us", "uk", "ca", "au", "de", "jp", "fr", "es", "it", "nl",
         "ru", "in", "cn", "br", "mx", "eu", "ch", "se", "no", "fi",
         "dk", "pl", "kr", "nz", "za", "ie", "pt", "gr", "be", "at",
-        "hk", "tw", "sg", "kr"
+        "hk", "tw", "sg"
     )
 
     private fun isLikelyUrl(candidate: String): Boolean {
@@ -140,56 +100,4 @@ object Utils {
 
         return true
     }
-}
-
-object NoteDeleteHelper {
-
-    @Composable
-    fun TrashNoteDialog(
-        context: Context,
-        coroutineScope: CoroutineScope,
-        showTrashDialog: Boolean,
-        trashLauncher: ActivityResultLauncher<IntentSenderRequest>,
-        onFetchUris: suspend () -> List<Uri>, // Lambda for async fetch
-        onDismissDelete: () -> Unit
-    ) {
-        if (showTrashDialog) {
-            val fetchedUris by produceState(initialValue = emptyList(), showTrashDialog) {
-                value = onFetchUris()
-            }
-            val noteCount = fetchedUris.size
-
-            AlertDialog(
-                onDismissRequest = onDismissDelete,
-                title = {
-                    Text(
-                        if (noteCount > 0) "Move $noteCount notes to Trash?"
-                        else "Move this note to Trash?"
-                    )
-                },
-                text = {
-                    Text(
-                        if (noteCount > 0) "These note(s) will be moved to Trash and can be restored."
-                        else "This note will be moved to Trash and can be restored."
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            onDismissDelete()
-
-                        }
-                    ) {
-                        Text("Move to Trash", color = AppTheme.danger)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismissDelete) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-    }
-
 }

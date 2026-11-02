@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -83,6 +84,7 @@ import androidx.window.embedding.SplitController
 import androidx.window.layout.WindowMetricsCalculator
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.isLargeDevice
 import com.chung.fluidnotes.views.components.GradientTopBar
 import com.chung.fluidnotes.views.components.dropmenu.NoteEditDropMenu
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
@@ -109,7 +111,8 @@ private fun displayCanSplit(activity: Activity): Boolean {
     val density = activity.resources.displayMetrics.density
     val w = bounds.width() / density
     val h = bounds.height() / density
-    return minOf(w, h) >= 600f && (w >= h || h / w <= 1.4f)
+    val result = minOf(w, h) >= 600f && (w >= h || h / w <= 1.4f)
+    return result
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -122,7 +125,10 @@ private fun rememberIsInSplit(): Boolean {
     val inSplit by remember(activity) {
         SplitController.getInstance(activity)
             .splitInfoList(activity)
-            .map { splits -> splits.any { it.contains(activity) } }
+            .map { splits ->
+                val inSplit = splits.any { it.contains(activity) }
+                inSplit
+            }
             .transformLatest { inSplit ->
                 // The first emission can arrive before the split exists.
                 // Only believe "not in a split" if it stays that way.
@@ -130,13 +136,12 @@ private fun rememberIsInSplit(): Boolean {
                 emit(inSplit)
             }
     }.collectAsState(initial = predicted)
-    return inSplit
+    return inSplit && predicted
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditViewScreen(
-    isInSplit: Boolean = false,
     isExistingNote: Boolean = true,
     isTrashedView: Boolean = false,
     noteTitle: String,
@@ -167,7 +172,7 @@ fun EditViewScreen(
     val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
         .asPaddingValues()
         .calculateBottomPadding()
-    val baseScrimHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
+    val baseScrimHeight = if (isLargeDevice()) 20.dp else 80.dp
 
     val titleFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -389,9 +394,9 @@ fun EditViewScreen(
 
         if (showDeleteDialog) {
             DeleteDialog(
-                onDismissRequest = { showTrashDialog = false },
+                onDismissRequest = { showDeleteDialog = false },
                 onConfirmation = {
-                    showTrashDialog = false
+                    showDeleteDialog = false
                     onDeleteConfirmed()
                 }
             )

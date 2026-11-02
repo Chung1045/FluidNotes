@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -78,8 +79,8 @@ fun AppDropdownMenu(
                 }
         ) {
             val anchor = LocalDropdownAnchor.current
-            val topPadding = anchor?.top ?: (46 * Utils.getUIScale()).dp
-            val horizontalPadding = anchor?.end ?: (16 * Utils.getUIScale()).dp
+            val topPadding = anchor?.top ?: (46 * getUIScale()).dp
+            val horizontalPadding = anchor?.end ?: (16 * getUIScale()).dp
 
             val menuShape = RoundedCornerShape(26.dp)
             val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)

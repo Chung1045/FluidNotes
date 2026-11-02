@@ -89,7 +89,6 @@ class NoteEditViewActivity : ComponentActivity() {
                 EditViewScreen(
                     isExistingNote = isExistingNote,
                     isTrashedView = isTrashed,
-                    isInSplit = isInSplit,
                     noteTitle = noteTitle,
                     noteContent = noteContent,
                     noteLastEdit = noteLastEdit,

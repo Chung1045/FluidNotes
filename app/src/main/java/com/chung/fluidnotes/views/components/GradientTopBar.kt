@@ -11,17 +11,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -33,7 +32,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -54,6 +52,8 @@ import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.R
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
+import com.chung.fluidnotes.utils.isLargeDevice
 import com.chung.fluidnotes.views.components.dropmenu.DropdownAnchor
 import com.chung.fluidnotes.views.components.dropmenu.LocalDropdownAnchor
 import com.chung.fluidnotes.views.components.dropmenu.NoteEditDropMenu
@@ -71,7 +71,7 @@ enum class GradientTopBarMode {
 }
 
 @Composable
-fun gradientTopBarHeight(): Dp = (120 * Utils.getUIScale()).dp
+fun gradientTopBarHeight(): Dp = (120 * getUIScale()).dp
 
 @Composable
 private fun topScrimBrush(): Brush = Brush.verticalGradient(
@@ -102,7 +102,7 @@ fun BottomScrim(modifier: Modifier = Modifier) {
     val navBarInset = WindowInsets.navigationBarsIgnoringVisibility
         .asPaddingValues()
         .calculateBottomPadding()
-    val baseHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
+    val baseHeight = if (isLargeDevice()) 20.dp else 80.dp
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -115,13 +115,13 @@ fun BottomScrim(modifier: Modifier = Modifier) {
     )
 }
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun BoxScope.GradientTopBar(
     topBarMode: GradientTopBarMode = GradientTopBarMode.Default,
     hazeState: HazeState,
     isUiChromeVisible: Boolean = true,
     isInSplit: Boolean = false,
+    useCloseIcon: Boolean = isInSplit,
     showMenu: Boolean = false,
     showBackButton: Boolean = true,
     showDrawerButton: Boolean = false,
@@ -132,9 +132,9 @@ fun BoxScope.GradientTopBar(
     onClose: () -> Unit = {},
     menuContent: @Composable () -> Unit = {},
 ) {
-    val buttonSize = (48 * Utils.getUIScale()).dp
-    val horizontalPadding = (16 * Utils.getUIScale()).dp
-    val topPadding = (8 * Utils.getUIScale()).dp
+    val buttonSize = (48 * getUIScale()).dp
+    val horizontalPadding = (16 * getUIScale()).dp
+    val topPadding = (8 * getUIScale()).dp
     val blurTexture = AppTheme.frostedTexture
 
     val context = LocalContext.current
@@ -198,8 +198,8 @@ fun BoxScope.GradientTopBar(
                             )
                     ) {
                         Icon(
-                            imageVector = if (isInSplit) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (isInSplit) "Close Viewer" else "Navigate Back",
+                            imageVector = if (useCloseIcon) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = if (useCloseIcon) "Close Viewer" else "Navigate Back",
                             tint = AppTheme.controlsForeground
                         )
                     }
@@ -262,64 +262,6 @@ fun BoxScope.GradientTopBar(
         )
     ) {
         menuContent()
-    }
-}
-
-@Composable
-fun BoxScope.GradientTopBarContainer(
-    hazeState: HazeState,
-    isUiChromeVisible: Boolean = true,
-    showScrim: Boolean = true,
-    modifier: Modifier = Modifier,
-    navigationIcon: (@Composable () -> Unit)? = null,
-    title: (@Composable () -> Unit)? = null,
-    actions: (@Composable RowScope.() -> Unit)? = null
-) {
-    val horizontalPadding = (16 * Utils.getUIScale()).dp
-    val topPadding = (8 * Utils.getUIScale()).dp
-
-    AnimatedVisibility(
-        visible = isUiChromeVisible,
-        enter = fadeIn(animationSpec = tween(200)),
-        exit = fadeOut(animationSpec = tween(200)),
-        modifier = modifier
-            .fillMaxWidth()
-            .align(Alignment.TopCenter)
-            .zIndex(3f)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(gradientTopBarHeight())
-        ) {
-            if (showScrim) {
-                Box(Modifier.matchParentSize().background(topScrimBrush()))
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding)
-                    .statusBarsPadding()
-                    .padding(top = topPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Navigation / Left Slot
-                navigationIcon?.invoke()
-
-                // Optional Middle Title Slot
-                if (title != null) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        title()
-                    }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
-                // Actions / Right Slot
-                actions?.invoke(this)
-            }
-        }
     }
 }
 

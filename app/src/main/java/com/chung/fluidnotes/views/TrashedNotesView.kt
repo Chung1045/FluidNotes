@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
-import com.chung.fluidnotes.utils.Utils.isLargeDevice
+import com.chung.fluidnotes.utils.isLargeDevice
 import com.chung.fluidnotes.utils.rememberLastNonEmpty
 import com.chung.fluidnotes.views.components.ActionBarMode
 import com.chung.fluidnotes.views.components.BottomActionBar

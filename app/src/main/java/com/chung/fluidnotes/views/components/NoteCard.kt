@@ -37,6 +37,7 @@ import com.chung.fluidnotes.activity.NoteEditViewActivity
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.OpenNoteState
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.isLargeDevice
 import kotlinx.coroutines.flow.map
 
 @Composable
@@ -61,10 +62,11 @@ fun NoteCard(
     val isActive by remember(noteId) {
         OpenNoteState.openNoteId.map { noteId != 0 && it == noteId }
     }.collectAsState(initial = noteId != 0 && OpenNoteState.openNoteId.collectAsState().value == noteId)
-    val highlighted = isSelected || isActive
+    val showAsOpen = isActive && isLargeDevice()
+    val highlighted = isSelected || showAsOpen
 
     val openNote = {
-        if (!isActive) {
+        if (!showAsOpen) {
             context.startActivity(
                 Intent(context, NoteEditViewActivity::class.java).apply {
                     putExtra("note_id", noteId)

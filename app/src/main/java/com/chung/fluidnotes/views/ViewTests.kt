@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chung.fluidnotes.R
-import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
 import com.chung.fluidnotes.views.components.FrostedFAB
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
@@ -146,7 +146,7 @@ fun SelectedItemCount2(
 
     Box(
         modifier = modifier
-            .height(height * Utils.getUIScale())
+            .height(height * getUIScale())
             .clip(CircleShape)
             .hazeBlur(
                 input = HazeInput.Sources(hazeState),

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -64,9 +65,9 @@ fun ActionBar(
     val context = LocalContext.current
     val isLowEnd = remember(context) { Utils.isLowEndDevice(context) }
 
-    val buttonSize = (48 * Utils.getUIScale()).dp
-    val cornerRadius = (24 * Utils.getUIScale()).dp
-    val horizontalContainerPadding = (4 * Utils.getUIScale()).dp
+    val buttonSize = (48 * getUIScale()).dp
+    val cornerRadius = (24 * getUIScale()).dp
+    val horizontalContainerPadding = (4 * getUIScale()).dp
     val blurTexture = AppTheme.frostedTexture
 
     AnimatedVisibility(
@@ -166,8 +167,8 @@ fun BoxScope.BottomActionBar(
     onDeleteClick: () -> Unit = {},
     onRestoreClick: () -> Unit = {}
 ) {
-    val bottomPadding = (16 * Utils.getUIScale()).dp
-    val gradientHeight = (80 * Utils.getUIScale()).dp
+    val bottomPadding = (16 * getUIScale()).dp
+    val gradientHeight = (80 * getUIScale()).dp
 
     AnimatedVisibility(
         visible = visible,

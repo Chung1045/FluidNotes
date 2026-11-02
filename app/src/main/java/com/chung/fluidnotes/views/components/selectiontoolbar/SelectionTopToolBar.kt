@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.getUIScale
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
@@ -46,7 +47,7 @@ fun SelectedItemCountToolbar(
     onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit
 ) {
-    val scale = Utils.getUIScale()
+    val scale = getUIScale()
     val targetHeight = (48 * scale).dp
     val blurTexture = AppTheme.frostedTexture
     val context = LocalContext.current
@@ -123,7 +124,7 @@ fun SelectedItemCount(
 
     Surface(
         modifier = modifier
-            .height(height * Utils.getUIScale())
+            .height(height * getUIScale())
             // Removed animateContentSize here to stop rectangular clipping,
             // relying on the inner content layout and smooth text transition.
             .clip(CircleShape)

@@ -57,7 +57,7 @@ import com.chung.fluidnotes.activity.TrashedNotesActivity
 import com.chung.fluidnotes.data.NoteItem
 import com.chung.fluidnotes.ui.theme.AppTheme
 import com.chung.fluidnotes.utils.OpenNoteState
-import com.chung.fluidnotes.utils.Utils
+import com.chung.fluidnotes.utils.isLargeDevice
 import com.chung.fluidnotes.utils.rememberLastNonEmpty
 import com.chung.fluidnotes.views.components.AppNavDrawer
 import com.chung.fluidnotes.views.components.BottomActionBar
@@ -67,7 +67,6 @@ import com.chung.fluidnotes.views.components.GradientTopBarMode
 import com.chung.fluidnotes.views.components.NoteCard
 import com.chung.fluidnotes.views.components.NoteCardSkeleton
 import com.chung.fluidnotes.views.components.TopScrim
-import com.chung.fluidnotes.views.components.dropmenu.HomeDropMenu
 import com.chung.fluidnotes.views.components.gradientTopBarHeight
 import com.chung.fluidnotes.views.components.selectiontoolbar.SelectedItemCountToolbar
 import com.chung.fluidnotes.views.components.selectiontoolbar.rememberSelectionState
@@ -88,10 +87,13 @@ fun HomeScreenView(
 ) {
     val displayedNotes = rememberLastNonEmpty(notes)
     val hazeState = rememberHazeState()
+    // Separate state for the nav drawer's glass: its source is the WHOLE screen
+    // (top bar, FAB, scrims included), not just the notes grid.
+    val drawerHazeState = rememberHazeState()
     val context = LocalContext.current
     val activity = context as Activity
     val scope = rememberCoroutineScope()
-    val isLargeDevice = Utils.isLargeDevice()
+    val isLargeDevice = isLargeDevice()
     val columnCells = remember(context) {
         if (isLargeDevice) {
             StaggeredGridCells.Adaptive(200.dp)
@@ -138,10 +140,10 @@ fun HomeScreenView(
     val navBarInset = navBars.asPaddingValues().calculateBottomPadding()
     val imeInsets = WindowInsets.ime
     val fabDensity = LocalDensity.current
-    val baseScrimHeight = if (Utils.isLargeDevice()) 20.dp else 80.dp
+    val baseScrimHeight = if (isLargeDevice()) 20.dp else 80.dp
 
     AppNavDrawer(
-        hazeState = hazeState,
+        hazeState = drawerHazeState,
         drawerState = drawerState,
         gesturesEnabled = !selection.isSelecting,
         onSettingsClick = onSettingsClick,
@@ -150,6 +152,7 @@ fun HomeScreenView(
         Box(
             modifier = modifier
                 .fillMaxSize()
+                .hazeSource(drawerHazeState)
                 .background(MaterialTheme.colorScheme.background)
         ) {
 
