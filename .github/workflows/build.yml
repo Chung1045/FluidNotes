@@ -1,0 +1,89 @@
+name: Build and Release
+run-name: Build and Release ${{ github.ref_name }}
+
+# - Push a commit to any branch   -> build a release APK and keep it as a workflow artifact
+# - Publish a release on GitHub   -> build with the tag as the version and attach the APK to the release
+on:
+  push:
+    branches: [ '**' ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to upload the APK to a release
+
+# A new push to the same branch cancels the older build (never cancels release builds)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle (with caching)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Derive version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ "$EVENT_NAME" = "release" ]; then
+            NAME="${TAG#v}"                 # v1.2.3-beta -> 1.2.3-beta (versionName)
+            CORE="${NAME%%-*}"              # 1.2.3
+            IFS=. read -r MAJOR MINOR PATCH <<< "$CORE"
+            # 1.2.3 -> 10203 (minor/patch up to 99); 1.1 -> 10100
+            CODE=$(( MAJOR * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+            FILE="FluidNotes-${TAG}-android.apk"
+          else
+            # Branch / manual builds: not a real version, just identifiable
+            SHORT="${GITHUB_SHA::7}"
+            NAME="0.0.0-dev.${SHORT}"
+            CODE="${GITHUB_RUN_NUMBER}"
+            FILE="FluidNotes-dev-${SHORT}-android.apk"
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "Version: $NAME (code $CODE) -> $FILE"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build release APK
+        run: >
+          ./gradlew assembleRelease
+          -PappVersionName=${{ steps.version.outputs.name }}
+          -PappVersionCode=${{ steps.version.outputs.code }}
+
+      - name: Rename APK
+        run: mv app/build/outputs/apk/release/*.apk "${{ steps.version.outputs.file }}"
+
+      - name: Upload APK as workflow artifact (branch builds)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.file }}
+          path: ${{ steps.version.outputs.file }}
+          if-no-files-found: error
+
+      - name: Upload APK to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "${{ steps.version.outputs.file }}" --clobber
