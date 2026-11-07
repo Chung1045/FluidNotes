@@ -1,11 +1,8 @@
 name: Build and Release
 run-name: Build and Release ${{ github.ref_name }}
 
-# - Push a commit to any branch   -> build a release APK and keep it as a workflow artifact
 # - Publish a release on GitHub   -> build with the tag as the version and attach the APK to the release
 on:
-  push:
-    branches: [ '**' ]
   release:
     types: [ published ]
   workflow_dispatch:
